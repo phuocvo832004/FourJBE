@@ -9,3 +9,4 @@ python-consul>=1.1.0
 kafka-python>=2.0.2
 azure-storage-blob>=12.16.0
 azure-cosmos
+python-dotenv

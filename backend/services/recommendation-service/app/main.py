@@ -1,3 +1,4 @@
+print("DEBUG: app/main.py execution started - BEGINNING OF FILE")
 # services/recommendation-service/app/main.py
 import pickle
 import os

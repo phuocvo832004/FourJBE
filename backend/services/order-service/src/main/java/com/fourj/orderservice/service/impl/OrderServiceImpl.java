@@ -3,6 +3,7 @@ package com.fourj.orderservice.service.impl;
 
 import com.fourj.orderservice.dto.*;
 import com.fourj.orderservice.exception.*;
+import com.fourj.orderservice.messaging.KafkaProducerService;
 import com.fourj.orderservice.model.*;
 import com.fourj.orderservice.repository.OrderRepository;
 import com.fourj.orderservice.service.OrderService;
@@ -44,6 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final CartClient cartClient;
     private final ProductClient productClient;
     private final PayOS payOS;
+    private final KafkaProducerService kafkaProducerService;
 
     @Override
     @Transactional
@@ -96,6 +98,15 @@ public class OrderServiceImpl implements OrderService {
 
             // Lưu đơn hàng
             Order savedOrder = orderRepository.save(order);
+
+            // Gửi sự kiện order created tới Kafka
+            try {
+                kafkaProducerService.sendOrderCreatedEvent(mapToDto(savedOrder));
+            } catch (Exception e) {
+                log.error("Lỗi khi gửi sự kiện order created tới Kafka cho order {}: {}", savedOrder.getId(), e.getMessage());
+                // Cân nhắc: Có nên rollback transaction hoặc xử lý lỗi gửi Kafka ở đây không?
+                // Hiện tại chỉ log lỗi và tiếp tục.
+            }
 
             // Xử lý thanh toán dựa trên paymentMethod
             PaymentMethod paymentMethod = PaymentMethod.valueOf(request.getPaymentMethod());
