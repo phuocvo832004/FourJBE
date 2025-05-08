@@ -645,4 +645,4 @@ if __name__ == "__main__":
     # uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
     print("To run the server, execute:")
     print("cd services/recommendation-service")
-    print("uvicorn app.main:app --reload --host 0.0.0.0 --port 8090") # Chọn port khác 8080 nếu cần
+    print("uvicorn app.main:app --reload --host 0.0.0.0 --port 8090") 

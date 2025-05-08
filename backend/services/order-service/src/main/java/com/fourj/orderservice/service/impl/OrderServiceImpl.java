@@ -6,6 +6,7 @@ import com.fourj.orderservice.exception.*;
 import com.fourj.orderservice.messaging.KafkaProducerService;
 import com.fourj.orderservice.model.*;
 import com.fourj.orderservice.repository.OrderRepository;
+import com.fourj.orderservice.service.OrderExportService;
 import com.fourj.orderservice.service.OrderService;
 import com.fourj.orderservice.service.client.CartClient;
 import com.fourj.orderservice.service.client.ProductClient;
@@ -46,6 +47,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductClient productClient;
     private final PayOS payOS;
     private final KafkaProducerService kafkaProducerService;
+    private final OrderExportService orderExportService;
 
     @Override
     @Transactional
@@ -98,6 +100,15 @@ public class OrderServiceImpl implements OrderService {
 
             // Lưu đơn hàng
             Order savedOrder = orderRepository.save(order);
+            
+            // Upload đơn hàng lên Azure Blob Storage
+            try {
+                String fileUrl = orderExportService.exportSingleOrder(savedOrder);
+                log.info("Đơn hàng #{} đã được upload lên Azure Blob Storage: {}", savedOrder.getOrderNumber(), fileUrl);
+            } catch (Exception e) {
+                // Chỉ ghi log lỗi, không làm gián đoạn luồng tạo đơn hàng
+                log.error("Không thể upload đơn hàng #{} lên Azure: {}", savedOrder.getOrderNumber(), e.getMessage());
+            }
 
             // Gửi sự kiện order created tới Kafka
             try {
@@ -424,6 +435,16 @@ public class OrderServiceImpl implements OrderService {
 
             // Lưu đơn hàng
             Order savedOrder = orderRepository.save(order);
+            
+            // Upload đơn hàng lên Azure Blob Storage
+            try {
+                String fileUrl = orderExportService.exportSingleOrder(savedOrder);
+                log.info("Đơn hàng #{} từ event đã được upload lên Azure Blob Storage: {}", 
+                        savedOrder.getOrderNumber(), fileUrl);
+            } catch (Exception e) {
+                // Chỉ ghi log lỗi, không làm gián đoạn luồng xử lý
+                log.error("Không thể upload đơn hàng #{} lên Azure: {}", savedOrder.getOrderNumber(), e.getMessage());
+            }
 
             // Xử lý thanh toán dựa trên paymentMethod
             PaymentMethod paymentMethod = PaymentMethod.valueOf(request.getPaymentMethod());

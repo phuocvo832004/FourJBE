@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -37,16 +38,20 @@ public class SecurityConfig {
         // Đặt cấu hình không tạo session
         http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         
+        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
+        
         // Kích hoạt CSRF và cấu hình CORS
         http.csrf(csrf -> csrf
+                .csrfTokenRequestHandler(requestHandler)
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringRequestMatchers("/api/sanctum/csrf-cookie")
             )
             .cors(cors -> cors.configurationSource(corsConfigurationSource()));
         
         // Cấu hình các quy tắc yêu cầu HTTP
         http.authorizeHttpRequests(auth -> auth
-            // Public endpoints - chỉ cho health check
-            .requestMatchers("/actuator/**").permitAll()
+            // Public endpoints - chỉ cho health check và csrf
+            .requestMatchers("/actuator/**", "/api/sanctum/csrf-cookie").permitAll()
             // Cho phép OPTIONS request không cần xác thực
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             
@@ -76,7 +81,7 @@ public class SecurityConfig {
         ));
         
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With", "X-XSRF-TOKEN"));
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);

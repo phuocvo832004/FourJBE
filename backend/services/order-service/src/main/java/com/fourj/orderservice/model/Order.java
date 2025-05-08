@@ -2,6 +2,7 @@ package com.fourj.orderservice.model;
 
 import com.fourj.orderservice.util.DateTimeUtil;
 import jakarta.persistence.*;
+import jakarta.persistence.Index;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -10,7 +11,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", indexes = {
+    @Index(name = "idx_order_is_uploaded", columnList = "isUploadedToAzure"),
+    @Index(name = "idx_order_status", columnList = "status"),
+    @Index(name = "idx_order_created_at", columnList = "createdAt")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -50,6 +55,9 @@ public class Order {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime completedAt;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean isUploadedToAzure = false;
 
     @PrePersist
     protected void onCreate() {

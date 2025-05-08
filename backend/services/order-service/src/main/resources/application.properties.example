@@ -13,3 +13,12 @@ app.cors.allowed-methods=GET, POST, PUT, DELETE, OPTIONS, PATCH
 app.cors.allowed-headers=Content-Type, Authorization
 app.cors.allow-credentials=true
 app.cors.max-age=3600 
+
+# Azure Blob Storage configuration
+azure.storage.connection-string=your-azure-storage-connection-string
+azure.storage.container-name=orders
+
+# Order Export configuration
+order.export.batch-size=1000
+order.export.max-retry=3
+order.export.history-days=90 

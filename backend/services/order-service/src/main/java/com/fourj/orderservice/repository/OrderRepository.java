@@ -65,4 +65,17 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     // Đếm số đơn hàng của seller theo trạng thái
     @Query("SELECT COUNT(DISTINCT o) FROM Order o JOIN o.items i WHERE i.sellerId = :sellerId AND o.status = :status")
     Long countBySellerIdAndStatus(@Param("sellerId") String sellerId, @Param("status") OrderStatus status);
+
+    List<Order> findByIsUploadedToAzureFalse();
+    
+    // Tìm đơn hàng chưa upload với giới hạn số lượng và sắp xếp theo thời gian tạo
+    @Query(value = "SELECT o FROM Order o WHERE o.isUploadedToAzure = false ORDER BY o.createdAt ASC")
+    List<Order> findOrdersForExport(Pageable pageable);
+    
+    // Tìm đơn hàng chưa upload trong khoảng thời gian
+    @Query(value = "SELECT o FROM Order o WHERE o.isUploadedToAzure = false AND o.createdAt BETWEEN :startDate AND :endDate ORDER BY o.createdAt ASC")
+    List<Order> findOrdersForExportInDateRange(
+            @Param("startDate") LocalDateTime startDate, 
+            @Param("endDate") LocalDateTime endDate,
+            Pageable pageable);
 }
