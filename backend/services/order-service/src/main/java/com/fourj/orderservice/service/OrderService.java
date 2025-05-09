@@ -25,7 +25,7 @@ public interface OrderService {
     Page<OrderDto> getOrdersByStatus(OrderStatus status, Pageable pageable);
     OrderDto updateOrderStatus(Long id, UpdateOrderStatusRequest request);
     OrderDto cancelOrder(Long id);
-    void createOrderFromEvent(String userId, CreateOrderRequest request);
+    OrderDto createOrderFromEvent(String userId, CreateOrderRequest request);
     void updateOrder(WebhookData data);
     Page<OrderDto> getAllOrders(Pageable pageable);
     Map<String, Object> getOrderStatistics();

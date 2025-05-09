@@ -56,9 +56,15 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth -> auth
             // Public endpoints
             .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/orders/export/test-batch").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/orders/export/test-single/**").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/orders/export/test-azure-connection").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/orders/export/trigger-weekly-export").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/orders/export/sync-all-pending").permitAll()
             .requestMatchers("/actuator/**", 
                            "/checkout/orders/cancel", 
-                           "/checkout/orders/success").permitAll()
+                           "/checkout/orders/success",
+                           "/api/orders/export/test-batch").permitAll()
             // Cho phép OPTIONS request không cần xác thực
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             

@@ -5,6 +5,7 @@ import com.fourj.orderservice.model.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -78,4 +79,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("startDate") LocalDateTime startDate, 
             @Param("endDate") LocalDateTime endDate,
             Pageable pageable);
+
+    @Modifying
+    @Query("UPDATE Order o SET o.isUploadedToAzure = true WHERE o.id IN :orderIds")
+    void markOrdersAsUploaded(@Param("orderIds") List<Long> orderIds);
 }

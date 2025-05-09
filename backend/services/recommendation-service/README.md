@@ -1,12 +1,12 @@
 # Recommendation Service
 
-Dịch vụ gợi ý sản phẩm sử dụng mô hình ALS (Alternating Least Squares) được tích hợp với Kafka và Azure Blob Storage để xử lý dữ liệu giao dịch theo thời gian thực.
+Dịch vụ gợi ý sản phẩm sử dụng mô hình ALS (Alternating Least Squares) được tích hợp với Azure Blob Storage để xử lý dữ liệu giao dịch.
 
 ## Tính năng
 
 - **Gợi ý sản phẩm**: Cung cấp API để lấy gợi ý sản phẩm cho người dùng dựa trên lịch sử mua hàng
-- **ETL tự động**: Nhận dữ liệu đơn hàng từ Kafka, lưu trữ vào Azure Blob Storage
-- **Cập nhật mô hình**: Tự động cập nhật mô hình theo lịch trình, sử dụng dữ liệu mới
+- **ETL**: Dữ liệu đơn hàng được đưa vào Azure Blob Storage.
+- **Cập nhật mô hình**: Tự động cập nhật mô hình theo lịch trình, sử dụng dữ liệu mới từ Azure Blob Storage.
 - **Tích hợp Consul**: Hỗ trợ đăng ký dịch vụ để phát hiện dịch vụ
 
 ## Cấu trúc dự án
@@ -16,7 +16,6 @@ recommendation-service/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py                # API chính (FastAPI)
-│   ├── kafka_consumer.py      # Consumer để xử lý events đơn hàng từ Kafka
 │   ├── batch_update.py        # Job cập nhật mô hình theo lịch
 │   ├── setup_storage.py       # Script thiết lập Azure Blob Storage
 │   └── entrypoint.sh          # Script tiện ích (có thể dùng cho khởi động hoặc tác vụ khác)
@@ -33,10 +32,10 @@ recommendation-service/
 
 ## Luồng dữ liệu
 
-1. **Thu thập dữ liệu**: Dịch vụ đơn hàng phát các sự kiện lên Kafka khi có đơn hàng mới
-2. **Xử lý dữ liệu**: Kafka Consumer xử lý sự kiện, lưu tương tác vào Azure Blob Storage
-3. **Cập nhật mô hình**: Batch job cập nhật mô hình định kỳ, huấn luyện lại mô hình ALS
-4. **Phục vụ gợi ý**: API gợi ý phục vụ các yêu cầu gợi ý sản phẩm cho người dùng
+1. **Thu thập dữ liệu**: Dữ liệu đơn hàng (tương tác người dùng-sản phẩm) được chuẩn bị và tải lên Azure Blob Storage.
+2. **Xử lý dữ liệu**: Dữ liệu tương tác từ Azure Blob Storage được sử dụng để cập nhật mô hình.
+3. **Cập nhật mô hình**: Batch job cập nhật mô hình định kỳ, huấn luyện lại mô hình ALS với dữ liệu mới nhất.
+4. **Phục vụ gợi ý**: API gợi ý phục vụ các yêu cầu gợi ý sản phẩm cho người dùng.
 
 ## Thiết lập môi trường
 
@@ -44,11 +43,8 @@ recommendation-service/
    - Tạo một Azure Storage Account
    - Tạo Access Key hoặc Connection String
    - Điền thông tin vào biến môi trường `AZURE_CONNECTION_STRING`
-
-2. **Kafka**:
-   - Đảm bảo có một cụm Kafka đang chạy
-   - Cấu hình `KAFKA_BOOTSTRAP_SERVERS` trỏ đến cụm Kafka
-   - Topic `order_events` đã được tạo (hoặc sửa biến môi trường `KAFKA_TOPIC`)
+   - Đảm bảo container được chỉ định trong `AZURE_CONTAINER` tồn tại.
+   - Dữ liệu tương tác mới cần được đặt trong đường dẫn `NEW_DATA_PATH` (ví dụ: `processed-interactions/new/`) trong container.
 
 ## Cài đặt
 
@@ -83,10 +79,9 @@ Các tệp cấu hình Kubernetes được cung cấp:
    ```
    Hoặc tạo trực tiếp bằng `kubectl create secret generic` cho từng giá trị:
    ```bash
-   kubectl create secret generic recommendation-secrets \
-     --from-literal=AZURE_CONNECTION_STRING='your_connection_string' \
-     --from-literal=KAFKA_BOOTSTRAP_SERVERS='your_kafka_servers' \
-     --from-literal=COSMOS_ENDPOINT='your_cosmos_endpoint' \
+   kubectl create secret generic recommendation-secrets \\
+     --from-literal=AZURE_CONNECTION_STRING='your_connection_string' \\
+     --from-literal=COSMOS_ENDPOINT='your_cosmos_endpoint' \\
      --from-literal=COSMOS_KEY='your_cosmos_key'
    # Thêm các secret khác nếu cần
    ```
@@ -111,7 +106,7 @@ Các tệp cấu hình Kubernetes được cung cấp:
 ## Cấu hình nâng cao
 
 ### Cập nhật mô hình
-Bạn có thể điều chỉnh lịch trình cập nhật mô hình bằng cách sửa biến môi trường `BATCH_SCHEDULE` theo định dạng crontab.
+Bạn có thể điều chỉnh lịch trình cập nhật mô hình bằng cách sửa biến môi trường `BATCH_SCHEDULE` theo định dạng crontab. Dữ liệu đầu vào cho quá trình cập nhật được lấy từ `AZURE_CONTAINER` tại đường dẫn `NEW_DATA_PATH`.
 
 ### Cấu hình mô hình
 Các thông số của mô hình ALS có thể được điều chỉnh thông qua các biến môi trường:
@@ -122,6 +117,5 @@ Các thông số của mô hình ALS có thể được điều chỉnh thông q
 
 ## Xử lý sự cố
 
-- **Lỗi không kết nối đến Kafka**: Kiểm tra cấu hình `KAFKA_BOOTSTRAP_SERVERS` và kết nối mạng
-- **Không thể truy cập Azure Blob Storage**: Xác nhận rằng `AZURE_CONNECTION_STRING` hợp lệ và tài khoản lưu trữ đang hoạt động
-- **Mô hình không cập nhật**: Kiểm tra logs của batch job và đảm bảo đủ quyền truy cập vào Azure Storage 
+- **Không thể truy cập Azure Blob Storage**: Xác nhận rằng `AZURE_CONNECTION_STRING` hợp lệ và tài khoản lưu trữ đang hoạt động. Kiểm tra quyền truy cập vào container và các blob cần thiết.
+- **Mô hình không cập nhật**: Kiểm tra logs của batch job (`batch_update.py`) và đảm bảo đủ quyền truy cập vào Azure Storage. Đảm bảo có dữ liệu mới trong `NEW_DATA_PATH`. 

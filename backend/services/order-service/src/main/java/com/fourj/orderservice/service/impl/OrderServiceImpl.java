@@ -75,11 +75,11 @@ public class OrderServiceImpl implements OrderService {
                     .map(item -> OrderItem.builder()
                             .productId(item.getProductId())
                             .productName(item.getProductName())
-                            .productImage(null) // nếu không có trong request, bạn để null hoặc fetch từ ProductService
+                            .productImage(null) 
                             .price(item.getPrice())
                             .quantity(item.getQuantity())
                             .subtotal(item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
-                            .order(null) // sẽ được set sau khi tạo Order
+                            .order(null) 
                             .build())
                     .collect(Collectors.toList());
 
@@ -403,7 +403,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public void createOrderFromEvent(String userId, CreateOrderRequest request) {
+    public OrderDto createOrderFromEvent(String userId, CreateOrderRequest request) {
         try {
             if (request.getItems() == null || request.getItems().isEmpty()) {
                 throw new EmptyCartException("Danh sách sản phẩm không được để trống");
@@ -472,7 +472,7 @@ public class OrderServiceImpl implements OrderService {
             }
 
             // Trả về OrderDto
-            mapToDto(savedOrder);
+            return mapToDto(savedOrder);
 
         } catch (Exception e) {
             log.error("Lỗi khi tạo đơn hàng từ sự kiện cho user {}: {}", userId, e.getMessage());

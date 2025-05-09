@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import pickle
@@ -8,15 +7,17 @@ from pathlib import Path
 import uuid
 import base64
 import time
-
+import io
+from dotenv import load_dotenv
 import numpy as np
 import pandas as pd
 from azure.storage.blob import BlobServiceClient, ContainerClient
 from azure.cosmos import CosmosClient, PartitionKey
 from implicit.als import AlternatingLeastSquares
-from scipy.sparse import csr_matrix, load_npz, save_npz
+from scipy.sparse import csr_matrix, load_npz, save_npz, lil_matrix
 from sklearn.preprocessing import LabelEncoder
-
+import gc
+load_dotenv()
 # --- Cấu hình logging ---
 logging.basicConfig(
     level=logging.INFO,
@@ -26,17 +27,18 @@ logger = logging.getLogger(__name__)
 
 # --- Cấu hình Azure Blob Storage ---
 AZURE_CONNECTION_STRING = os.getenv('AZURE_CONNECTION_STRING', '')
-AZURE_CONTAINER = os.getenv('AZURE_CONTAINER', 'recommendation-data')
-USE_AZURE_STORAGE = os.getenv('USE_AZURE_STORAGE', 'true').lower() == 'true'
+AZURE_CONTAINER = os.getenv('AZURE_CONTAINER', 'orderhistory')
+USE_AZURE_STORAGE = os.getenv('USE_AZURE_STORAGE', 'false').lower() == 'true'
 AZURE_USER_ENCODER_BLOB_NAME = os.getenv('AZURE_USER_ENCODER_BLOB_NAME', 'user_encoder.pkl')
 AZURE_PRODUCT_ENCODER_BLOB_NAME = os.getenv('AZURE_PRODUCT_ENCODER_BLOB_NAME', 'product_encoder.pkl')
 AZURE_INTERACTION_MATRIX_BLOB_NAME = os.getenv('AZURE_INTERACTION_MATRIX_BLOB_NAME', 'interaction_matrix.npz')
+
 
 # --- Cấu hình Azure Cosmos DB ---
 COSMOS_ENDPOINT = os.getenv('COSMOS_ENDPOINT')
 COSMOS_KEY = os.getenv('COSMOS_KEY')
 COSMOS_DATABASE_NAME = os.getenv('COSMOS_DATABASE_NAME', 'RecommendationDB')
-COSMOS_CONTAINER_NAME = os.getenv('COSMOS_MODELS_CONTAINER_NAME', 'Models') # Container riêng cho models
+COSMOS_CONTAINER_NAME = os.getenv('COSMOS_MODELS_CONTAINER_NAME', 'Models') 
 
 # --- Đường dẫn dữ liệu mới ---
 NEW_DATA_PATH = os.getenv('NEW_DATA_PATH', 'processed-interactions/new/')
@@ -46,10 +48,13 @@ ARCHIVE_PATH = os.getenv('ARCHIVE_PATH', 'processed-interactions/archived/')
 ARTIFACTS_PATH = os.getenv('ARTIFACTS_PATH', 'artifacts/')
 
 # --- Cấu hình model ---
-FACTORS = int(os.getenv('ALS_FACTORS', '100'))  # Số lượng yếu tố ẩn
+# TẠM THỜI GIẢM ĐỂ TEST
+FACTORS = int(os.getenv('ALS_FACTORS_TEST', '10'))  # Số lượng yếu tố ẩn (GIẢM TỪ 50)
 REGULARIZATION = float(os.getenv('ALS_REGULARIZATION', '0.01'))  # Hệ số regularization
-ITERATIONS = int(os.getenv('ALS_ITERATIONS', '15'))  # Số lần lặp
-ALPHA = float(os.getenv('ALS_ALPHA', '1.0'))  # Alpha parameter (confidence scaling)
+ITERATIONS = int(os.getenv('ALS_ITERATIONS_TEST', '2'))  # Số lần lặp (GIẢM TỪ 20)
+ALPHA = float(os.getenv('ALS_ALPHA', '15.0'))  # Alpha parameter (confidence scaling)
+
+logger.info(f"ĐANG CHẠY Ở CHẾ ĐỘ TEST VỚI FACTORS={FACTORS}, ITERATIONS={ITERATIONS}")
 
 def download_blob_to_file(blob_client, file_path, max_retries=3, retry_delay=2):
     """
@@ -114,24 +119,16 @@ def upload_file_to_blob(container_client, file_path, blob_name, max_retries=3, r
             return False
     return False
 
-def load_interaction_files(container_client, new_data_path, batch_size=10, validate_data=True):
+def load_interaction_files(container_client, new_data_path, batch_size=5, validate_data=True):
     """
     Tải tất cả các files tương tác mới từ Azure Blob Storage
-    
-    Args:
-        container_client: Azure container client
-        new_data_path (str): Đường dẫn chứa các files tương tác mới
-        batch_size (int): Số lượng files xử lý trong một lô
-        validate_data (bool): Có kiểm tra tính hợp lệ của dữ liệu không
-        
-    Returns:
-        pandas.DataFrame: DataFrame chứa các tương tác đã được gộp
     """
-    all_interactions = []
+    # Thay vì load tất cả vào bộ nhớ, xử lý từng lô và merge ngay
+    result_df = None
     
     # Liệt kê tất cả các blobs trong đường dẫn
     blob_list = list(container_client.list_blobs(name_starts_with=new_data_path))
-    blob_count = 0
+    blob_count = len(blob_list)
     processed_count = 0
     invalid_count = 0
     
@@ -144,73 +141,55 @@ def load_interaction_files(container_client, new_data_path, batch_size=10, valid
         
         for blob in batch_blobs:
             try:
-                # Tải nội dung của blob
                 blob_client = container_client.get_blob_client(blob.name)
-                data = blob_client.download_blob().readall()
-                
-                # Parse JSON
-                interactions = json.loads(data)
-                
+                # Đọc file theo chunk thay vì toàn bộ vào memory
+                df_new_interactions = pd.read_csv(
+                    io.StringIO(blob_client.download_blob().readall().decode('utf-8')),
+                    dtype={'user_id': str, 'product_id': str},  # Định nghĩa kiểu dữ liệu trước
+                    usecols=lambda x: x in ['user_id', 'product_id', 'quantity']  # Chỉ lấy cột cần thiết
+                )
+
                 if validate_data:
-                    # Kiểm tra tính hợp lệ của dữ liệu
-                    valid_interactions = []
-                    for interaction in interactions:
-                        # Kiểm tra các trường bắt buộc
-                        if not all(k in interaction for k in ['user_id', 'product_id', 'quantity']):
-                            logger.warning(f"Bỏ qua tương tác không hợp lệ, thiếu trường: {interaction}")
-                            invalid_count += 1
-                            continue
-                        
-                        # Kiểm tra kiểu dữ liệu
-                        try:
-                            user_id = int(interaction['user_id'])
-                            product_id = int(interaction['product_id'])
-                            quantity = float(interaction['quantity'])
-                            
-                            # Kiểm tra giá trị hợp lệ
-                            if user_id <= 0 or product_id <= 0 or quantity <= 0:
-                                logger.warning(f"Bỏ qua tương tác với giá trị không hợp lệ: {interaction}")
-                                invalid_count += 1
-                                continue
-                                
-                            # Cập nhật với giá trị đã chuyển đổi
-                            interaction['user_id'] = user_id
-                            interaction['product_id'] = product_id
-                            interaction['quantity'] = quantity
-                            
-                            valid_interactions.append(interaction)
-                        except (ValueError, TypeError):
-                            logger.warning(f"Bỏ qua tương tác với kiểu dữ liệu không hợp lệ: {interaction}")
-                            invalid_count += 1
-                            continue
+                    # Bỏ các dòng không hợp lệ
+                    df_new_interactions.dropna(subset=['user_id', 'product_id', 'quantity'], inplace=True)
+                    if df_new_interactions.empty:
+                        continue
                     
-                    batch_interactions.extend(valid_interactions)
-                else:
-                    # Nếu không kiểm tra tính hợp lệ, thêm tất cả
-                    batch_interactions.extend(interactions)
-                
-                blob_count += 1
-                processed_count += len(batch_interactions)
-                
-            except json.JSONDecodeError:
-                logger.error(f"Lỗi khi phân tích JSON từ blob {blob.name}")
+                    # Chuyển đổi và kiểm tra
+                    df_new_interactions['quantity'] = pd.to_numeric(df_new_interactions['quantity'], errors='coerce')
+                    df_new_interactions = df_new_interactions[df_new_interactions['quantity'] > 0]
+                    if df_new_interactions.empty:
+                        continue
+                        
+                processed_count += len(df_new_interactions)
+                batch_interactions.append(df_new_interactions)
             except Exception as e:
                 logger.error(f"Lỗi khi xử lý blob {blob.name}: {e}")
+                invalid_count += 1
         
-        # Thêm tương tác từ lô hiện tại vào danh sách tổng
-        all_interactions.extend(batch_interactions)
-        logger.info(f"Lô {i//batch_size + 1} đã xử lý: {len(batch_interactions)} tương tác hợp lệ")
+        # Gộp dữ liệu lô hiện tại
+        if batch_interactions:
+            batch_df = pd.concat(batch_interactions, ignore_index=True)
+            
+            # Nếu là lô đầu tiên, khởi tạo result_df
+            if result_df is None:
+                result_df = batch_df
+            else:
+                # Gộp với kết quả hiện tại
+                result_df = pd.concat([result_df, batch_df], ignore_index=True)
+            
+            # Xóa biến tạm
+            del batch_df
+            del batch_interactions
+            gc.collect()
     
-    logger.info(f"Đã đọc {blob_count} files, tổng số {processed_count} tương tác hợp lệ")
-    if invalid_count > 0:
-        logger.warning(f"Đã bỏ qua {invalid_count} tương tác không hợp lệ")
+    logger.info(f"Đã đọc {blob_count} files, {processed_count} tương tác hợp lệ, bỏ qua {invalid_count} lỗi")
     
-    # Nếu không có tương tác nào, trả về DataFrame trống
-    if not all_interactions:
+    # Nếu không có dữ liệu
+    if result_df is None or result_df.empty:
         return pd.DataFrame()
     
-    # Chuyển đổi thành DataFrame
-    return pd.DataFrame(all_interactions)
+    return result_df
 
 def archive_processed_files(container_client, new_data_path, archive_path):
     """
@@ -382,10 +361,10 @@ def load_existing_artifacts(blob_service_client, container_name, cosmos_containe
             factors=FACTORS,
             regularization=REGULARIZATION,
             iterations=ITERATIONS,
-            alpha=ALPHA,
+            num_threads=0,  # Sử dụng tất cả cores cho container
             random_state=42
         )
-        logger.info("Không tìm thấy model trong Cosmos DB, tạo model mới")
+        logger.info("Không tìm thấy model trong Cosmos DB, tạo model mới với num_threads=0")
 
     # Xác định tên blob cho các artifacts từ model_doc hoặc sử dụng mặc định
     user_encoder_blob_name = AZURE_USER_ENCODER_BLOB_NAME
@@ -442,13 +421,6 @@ def load_existing_artifacts(blob_service_client, container_name, cosmos_containe
 def update_artifacts_with_new_data(artifacts, interactions_df):
     """
     Cập nhật artifacts hiện có với dữ liệu tương tác mới
-    
-    Args:
-        artifacts (dict): Dictionary chứa các artifacts hiện có
-        interactions_df (pandas.DataFrame): DataFrame chứa dữ liệu tương tác mới
-        
-    Returns:
-        dict: Dictionary chứa các artifacts đã cập nhật
     """
     if interactions_df.empty:
         logger.info("Không có dữ liệu mới để cập nhật")
@@ -457,87 +429,116 @@ def update_artifacts_with_new_data(artifacts, interactions_df):
     user_encoder = artifacts['user_encoder']
     product_encoder = artifacts['product_encoder']
     
-    # Xử lý dữ liệu tương tác
-    # Chỉ lấy các cột cần thiết
+    # Chỉ lấy các cột cần thiết và giảm bộ nhớ
     df = interactions_df[['user_id', 'product_id', 'quantity']].copy()
     
-    # Chuyển đổi từ string sang int nếu cần
-    if df['user_id'].dtype == 'object':
-        df['user_id'] = df['user_id'].astype(int)
-    if df['product_id'].dtype == 'object':
-        df['product_id'] = df['product_id'].astype(int)
+    # Chuyển đổi user_id thành chuỗi
+    df['user_id'] = df['user_id'].astype(str)
     
-    # Update encoders với dữ liệu mới
-    # Lưu ý: Nếu đã có dữ liệu, cần kết hợp dữ liệu cũ và mới
-    unique_users = df['user_id'].unique()
-    unique_products = df['product_id'].unique()
+    # Lấy unique users/products với hiệu suất cao hơn
+    unique_users = np.unique(df['user_id'].values)
+    unique_products = np.unique(df['product_id'].values)
     
-    # Nếu encoder đã có dữ liệu trước đó
+    # Xử lý encoders
     if hasattr(user_encoder, 'classes_') and len(user_encoder.classes_) > 0:
-        # Kết hợp các giá trị cũ và mới
+        # Chuyển sang numpy array để xử lý hiệu quả
+        user_encoder.classes_ = np.array([str(u) for u in user_encoder.classes_])
         all_users = np.unique(np.concatenate([user_encoder.classes_, unique_users]))
         user_encoder.classes_ = all_users
     else:
-        # Fit encoder với dữ liệu mới
         user_encoder.fit(unique_users)
     
     if hasattr(product_encoder, 'classes_') and len(product_encoder.classes_) > 0:
-        # Kết hợp các giá trị cũ và mới
+        product_encoder.classes_ = np.array([str(p) for p in product_encoder.classes_])
         all_products = np.unique(np.concatenate([product_encoder.classes_, unique_products]))
         product_encoder.classes_ = all_products
     else:
-        # Fit encoder với dữ liệu mới
         product_encoder.fit(unique_products)
     
     # Chuyển đổi user_id và product_id thành indices
     df['user_idx'] = user_encoder.transform(df['user_id'])
     df['product_idx'] = product_encoder.transform(df['product_id'])
     
-    # Tạo ma trận tương tác mới từ dữ liệu mới
+    # Tạo ma trận tương tác mới
     user_count = len(user_encoder.classes_)
     product_count = len(product_encoder.classes_)
     
-    # Tạo sparse matrix từ dữ liệu mới
+    # Tạo ma trận mới
     rows = df['user_idx'].values
     cols = df['product_idx'].values
     data = df['quantity'].values
     
+    # Giảm bớt bộ nhớ bằng cách xóa DataFrame sau khi trích xuất dữ liệu
+    del df
+    gc.collect()
+    
+    # Tạo ma trận thưa dạng COO trước, rồi chuyển sang CSR - hiệu quả hơn cho việc xây dựng
     new_matrix = csr_matrix((data, (rows, cols)), shape=(user_count, product_count))
+    new_matrix.eliminate_zeros()  # Loại bỏ zeros để giảm bộ nhớ
     
     # Nếu đã có ma trận cũ, kết hợp với ma trận mới
     if 'interaction_matrix' in artifacts:
         old_matrix = artifacts['interaction_matrix']
         
-        # Nếu kích thước ma trận cũ khác với ma trận mới, cần resize
+        # Xử lý nếu kích thước khác nhau
         if old_matrix.shape != new_matrix.shape:
-            # Tạo ma trận lớn hơn
-            old_data = old_matrix.data
-            old_indices = old_matrix.indices
-            old_indptr = old_matrix.indptr
+            logger.info(f"Thay đổi kích thước ma trận từ {old_matrix.shape} thành {new_matrix.shape}")
             
-            # Tạo ma trận mới với kích thước phù hợp
-            resized_matrix = csr_matrix((old_data, old_indices, old_indptr), 
-                                         shape=(user_count, product_count))
+            # Sử dụng lil_matrix cho việc gán phần tử hiệu quả
+            combined_matrix = lil_matrix((user_count, product_count))
             
-            # Cộng ma trận cũ và mới
-            combined_matrix = resized_matrix + new_matrix
+            # Sao chép dữ liệu từ ma trận cũ
+            old_rows, old_cols = old_matrix.shape
+            min_rows = min(old_rows, user_count)
+            min_cols = min(old_cols, product_count)
+            
+            # Sao chép theo block để tiết kiệm bộ nhớ
+            block_size = 10000  # Kích thước block phù hợp
+            for i in range(0, min_rows, block_size):
+                end_i = min(i + block_size, min_rows)
+                combined_matrix[i:end_i, :min_cols] = old_matrix[i:end_i, :min_cols]
+                
+                # Giải phóng bộ nhớ thường xuyên
+                if i % (block_size * 5) == 0:
+                    gc.collect()
+            
+            # Chuyển sang CSR cho phép tính hiệu quả
+            combined_matrix = combined_matrix.tocsr()
+            
+            # Cộng ma trận mới 
+            combined_matrix = combined_matrix + new_matrix
+            
+            # Loại bỏ số 0
+            combined_matrix.eliminate_zeros()
         else:
             # Cộng trực tiếp nếu kích thước giống nhau
             combined_matrix = old_matrix + new_matrix
+            combined_matrix.eliminate_zeros()
+        
+        # Xóa ma trận cũ ngay khi không cần nữa để giải phóng bộ nhớ
+        del old_matrix
+        gc.collect()
         
         artifacts['interaction_matrix'] = combined_matrix
         logger.info(f"Đã kết hợp ma trận cũ và mới, kích thước mới: {combined_matrix.shape}")
     else:
-        # Nếu chưa có ma trận cũ
         artifacts['interaction_matrix'] = new_matrix
         logger.info(f"Đã tạo ma trận tương tác mới, kích thước: {new_matrix.shape}")
     
-    # Huấn luyện lại mô hình
+    # Huấn luyện lại mô hình với tham số phù hợp
     model = artifacts['model']
-    model.fit(artifacts['interaction_matrix'])
+    # Tăng n_jobs để tận dụng đa luồng, giảm iterations để giảm thời gian xử lý
+    logger.info(f"Ma trận sau khi kiểm tra/làm sạch: dtype={new_matrix.dtype}, nnz={new_matrix.nnz}")
+
+    logger.info("Transposing interaction matrix to item-user format for fitting.")
+    item_user_matrix_to_fit = new_matrix.T.tocsr() # Transpose và đảm bảo là CSR
+
+    model.fit(item_user_matrix_to_fit)
     artifacts['model'] = model
     logger.info("Đã huấn luyện lại mô hình ALS")
     
+    # Chạy GC một lần nữa trước khi trả về kết quả
+    gc.collect()
     return artifacts
 
 def save_model_to_cosmosdb(model, cosmos_container, user_encoder_blob_name, product_encoder_blob_name, matrix_blob_name):

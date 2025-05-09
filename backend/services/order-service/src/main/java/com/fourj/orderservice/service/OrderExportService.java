@@ -1,9 +1,7 @@
 package com.fourj.orderservice.service;
 
 import com.fourj.orderservice.model.Order;
-import org.springframework.scheduling.annotation.Scheduled;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 public interface OrderExportService {
@@ -27,7 +25,7 @@ public interface OrderExportService {
      *
      * @return URL của file Excel đã upload
      */
-    String exportOrdersToExcel();
+    String exportOrdersToCsv();
 
     /**
      * Export một đơn hàng mới ra file Excel và upload lên Azure Blob Storage

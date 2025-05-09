@@ -48,15 +48,6 @@ public class UserHeadersAuthenticationFilter extends OncePerRequestFilter {
             originalToken = originalToken.substring(7);
         }
         
-        // Kiểm tra xem có phải là endpoint public không cần xác thực
-        boolean isPublicEndpoint = checkIfPublicEndpoint(request.getRequestURI());
-        
-        if (isPublicEndpoint) {
-            logger.debug("Public endpoint detected, skipping authentication: {}", request.getRequestURI());
-            filterChain.doFilter(request, response);
-            return;
-        }
-        
         if (userId != null && !userId.isEmpty()) {
             logger.debug("User ID found in headers: {}", userId);
             
@@ -118,7 +109,8 @@ public class UserHeadersAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             logger.debug("Authentication set in SecurityContext for user: {}", userId);
         } else {
-            logger.debug("No user ID found in headers, proceeding without authentication");
+            logger.debug("No user ID found in headers, proceeding without authentication for non-public endpoints or if headers are missing.");
+            // Không làm gì cả, để các filter khác xử lý (ví dụ: AnonymousAuthenticationFilter hoặc filter bắt buộc xác thực)
         }
         
         filterChain.doFilter(request, response);
@@ -150,13 +142,5 @@ public class UserHeadersAuthenticationFilter extends OncePerRequestFilter {
         claims.put("token_value", tokenValue);
         
         return new Jwt(tokenValue, issuedAt, expiresAt, headers, claims);
-    }
-    
-    private boolean checkIfPublicEndpoint(String uri) {
-        // Kiểm tra các endpoint không cần xác thực
-        return uri.startsWith("/actuator") || 
-               uri.equals("/api/payments/webhook") ||
-               uri.equals("/checkout/orders/cancel") ||
-               uri.equals("/checkout/orders/success");
     }
 } 
