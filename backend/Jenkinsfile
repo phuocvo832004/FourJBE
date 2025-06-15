@@ -39,11 +39,8 @@ pipeline {
                         microservices = lines.join(' ')
                     }
                     echo "Filtered microservices: '${microservices}'"
-                    env.MICROSERVICES = "${microservices}"
 
-                    echo "Discovered microservices: ${env.MICROSERVICES}"
-
-                    if (env.MICROSERVICES.trim() == '') {
+                    if (microservices.trim() == '') {
                         error('No microservices found in backend/services/. Please check the directory structure.')
                     }
                 }
