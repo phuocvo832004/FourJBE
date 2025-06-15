@@ -30,7 +30,7 @@ pipeline {
                 script {
 
                     def microservices = bat(returnStdout: true, script: '''
-                        powershell -Command "Get-ChildItem -Directory services | Where-Object { $_.Name -ne '.idea' } | ForEach-Object { $_.Name }"
+                        powershell -Command "Get-ChildItem -Directory backend/services | Where-Object { $_.Name -ne '.idea' } | ForEach-Object { $_.Name }"
                     ''').trim().replaceAll('\r\n', ' ').replaceAll('\n', ' ')
                     env.MICROSERVICES = microservices
 
