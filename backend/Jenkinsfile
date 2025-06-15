@@ -242,7 +242,7 @@ pipeline {
                     for (service in services) {
                         dir("backend/services/${service}") {
                             withSonarQubeEnv("${SONARQUBE_ENV}") {
-                                sh "mvn sonar:sonar"
+                                bat "mvn sonar:sonar"
                             }
                         }
                     }
