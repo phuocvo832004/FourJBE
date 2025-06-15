@@ -28,8 +28,7 @@ pipeline {
             steps {
                 echo 'Discovering microservices in backend/services/...'
                 script {
-                    // Sử dụng PowerShell để liệt kê tất cả các thư mục con trong 'services/'
-                    // trừ thư mục '.idea/' và chuyển kết quả thành một chuỗi cách nhau bởi dấu cách.
+
                     def microservices = bat(returnStdout: true, script: '''
                         powershell -Command "Get-ChildItem -Directory services | Where-Object { $_.Name -ne '.idea' } | ForEach-Object { $_.Name }"
                     ''').trim().replaceAll('\r\n', ' ').replaceAll('\n', ' ')
@@ -48,7 +47,7 @@ pipeline {
         stage('Build and Test All Microservices') {
             steps {
                 script {
-                    def services = env.MICROSERVICES.split(' ').findAll { it != '' } // Tách chuỗi thành danh sách và lọc bỏ khoảng trắng thừa
+                    def services = env.MICROSERVICES.split(' ').findAll { it != '' }
                     if (services.isEmpty()) {
                         error('No microservices to build or test. Aborting.')
                     }
@@ -184,23 +183,6 @@ pipeline {
                                 "KAFKA_SERVERS=kafka:9092",
                                 "CONSUL_HOST=consul",
                                 "CONSUL_PORT=8500"
-                            ],
-                            networks: ['gateway-network', 'backend-network']
-                        ],
-                        'recommendation-service': [
-                            ports: "8090:8090",
-                            env: [
-                                "SERVICE_PORT=8090",
-                                "CONSUL_HOST=consul",
-                                "CONSUL_PORT=8500",
-                                "KAFKA_BOOTSTRAP_SERVERS=kafka:9092",
-                                "ORDER_CREATED_TOPIC=order_created_topic",
-                                "AZURE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=orderhistoryfourj;AccountKey=AKWOHHSM2KRbQkaLtJYUIQHEwb3Sz+YG1ey+laONUUwdHuDScG/oDIkZuBlp73HHmNucEl83wn/l+AStbb2w8w==;EndpointSuffix=core.windows.net",
-                                "USE_AZURE_STORAGE=true",
-                                "COSMOS_ENDPOINT=https://fourjpredictmodel.documents.azure.com:443/",
-                                "COSMOS_KEY=ebAXWVrkreQcKanNWYNDp2X60B1i0r383JuAZ4q93MXXwXyPjWpVhD9icP7KfbPw6Er9o9DJHKRdACDb2Vhegg==",
-                                "COSMOS_DATABASE_NAME=RecommendationDB",
-                                "COSMOS_MODELS_CONTAINER_NAME=Models"
                             ],
                             networks: ['gateway-network', 'backend-network']
                         ]
