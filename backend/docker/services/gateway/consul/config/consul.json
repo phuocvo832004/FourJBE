@@ -1,0 +1,22 @@
+{
+  "datacenter": "dc1",
+  "data_dir": "/consul/data",
+  "log_level": "INFO",
+  "node_name": "consul-server",
+  "server": true,
+  "ui_config": {
+    "enabled": true
+  },
+  "addresses": {
+    "http": "0.0.0.0"
+  },
+  "ports": {
+    "dns": 8600,
+    "http": 8500,
+    "https": -1,
+    "grpc": 8502
+  },
+  "connect": {
+    "enabled": true
+  }
+}

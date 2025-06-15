@@ -1,0 +1,12 @@
+-- Insert Categories
+INSERT INTO categories (id, name, description, image_url, created_at, updated_at) VALUES (1, 'Electronics', 'Electronic devices and gadgets', 'https://via.placeholder.com/150', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO categories (id, name, description, image_url, created_at, updated_at) VALUES (2, 'Fashion', 'Clothing and accessories', 'https://via.placeholder.com/150', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO categories (id, name, description, image_url, created_at, updated_at) VALUES (3, 'Home & Kitchen', 'Home and kitchen products', 'https://via.placeholder.com/150', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+-- Insert Products
+INSERT INTO products (id, name, description, price, image_url, category_id, stock, is_active, created_at, updated_at) VALUES (1, 'Smartphone X', 'Latest smartphone with advanced features', 999.99, 'https://via.placeholder.com/300', 1, 100, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO products (id, name, description, price, image_url, category_id, stock, is_active, created_at, updated_at) VALUES (2, 'Laptop Pro', 'High-performance laptop for professionals', 1499.99, 'https://via.placeholder.com/300', 1, 50, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO products (id, name, description, price, image_url, category_id, stock, is_active, created_at, updated_at) VALUES (3, 'T-shirt Basic', 'Comfortable cotton t-shirt', 19.99, 'https://via.placeholder.com/300', 2, 200, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO products (id, name, description, price, image_url, category_id, stock, is_active, created_at, updated_at) VALUES (4, 'Jeans Classic', 'Classic blue jeans', 49.99, 'https://via.placeholder.com/300', 2, 150, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO products (id, name, description, price, image_url, category_id, stock, is_active, created_at, updated_at) VALUES (5, 'Coffee Maker', 'Automatic coffee maker', 89.99, 'https://via.placeholder.com/300', 3, 75, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO products (id, name, description, price, image_url, category_id, stock, is_active, created_at, updated_at) VALUES (6, 'Toaster Pro', 'Professional 4-slice toaster', 59.99, 'https://via.placeholder.com/300', 3, 100, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP); 

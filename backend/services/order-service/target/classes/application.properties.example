@@ -1,0 +1,24 @@
+spring.application.name=order-service
+
+# PayOS Configuration
+PAYOS_CLIENT_ID=your-payos-client-id
+PAYOS_API_KEY=your-payos-api-key
+PAYOS_CHECKSUM_KEY=your-payos-checksum-key
+
+PAYOS_WebHook=your-webhook-url
+
+# CORS configuration
+app.cors.allowed-origins=http://localhost:5173, http://localhost:3000, https://example.com
+app.cors.allowed-methods=GET, POST, PUT, DELETE, OPTIONS, PATCH
+app.cors.allowed-headers=Content-Type, Authorization
+app.cors.allow-credentials=true
+app.cors.max-age=3600 
+
+# Azure Blob Storage configuration
+azure.storage.connection-string=your-azure-storage-connection-string
+azure.storage.container-name=orders
+
+# Order Export configuration
+order.export.batch-size=1000
+order.export.max-retry=3
+order.export.history-days=90 

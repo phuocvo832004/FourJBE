@@ -1,0 +1,77 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: product-service
+    url: http://product-service:8083
+    routes:
+      - name: product-admin-route
+        paths:
+          - /api/products/admin
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            # ID của Consumer mà plugin này áp dụng (nếu có), bỏ trống để áp dụng cho tất cả
+            consumer: "" 
+            config:
+              # Client ID từ nhà cung cấp OIDC (Auth0, Keycloak, v.v.)
+              client_id: "your-client-id-from-auth0"
+              
+              # Client Secret từ nhà cung cấp OIDC
+              client_secret: "your-client-secret-from-auth0"
+              
+              # URL discovery của nhà cung cấp OIDC
+              discovery: "https://your-auth0-domain.auth0.com/.well-known/openid-configuration"
+              
+              # Danh sách scope yêu cầu từ OIDC
+              scope: "openid profile email"
+              
+              # Response type cho OAuth2/OIDC, thường là "code"
+              response_type: "code"
+              
+              # URL để xử lý callback sau khi xác thực
+              redirect_uri_path: "/callback"
+              
+              # Endpoint Introspection để kiểm tra token (với một số nhà cung cấp)
+              introspection_endpoint: "https://your-auth0-domain.auth0.com/oauth/token"
+              
+              # Phương thức xác thực với Introspection endpoint
+              introspection_endpoint_auth_method: "client_secret_post"
+              
+              # Phương thức xác thực với Token endpoint
+              token_endpoint_auth_method: "client_secret_post"
+              
+              # Chỉ accept token mà không redirect (yes/no)
+              bearer_only: "no"
+              
+              # Tên realm được sử dụng trong response WWW-Authenticate
+              realm: "kong"
+              
+              # Có xác minh SSL khi kết nối tới OIDC provider không
+              ssl_verify: "no"
+              
+              # Khóa bí mật để mã hóa session cookie
+              session_secret: "a-very-secret-key-for-encryption"
+              
+              # Trang recovery sử dụng khi có lỗi
+              recovery_page_path: "/error"
+              
+              # Path để xử lý logout
+              logout_path: "/logout"
+              
+              # URL redirect sau khi logout
+              redirect_after_logout_uri: "/"
+              
+              # Bộ lọc URL/endpoint
+              filters: "pattern1,pattern2"
+              
+              # Các header được gửi tới upstream service
+              upstream_headers:
+                X-User-ID: sub
+                X-User-Email: email
+                X-User-Name: name
+                X-User-Permissions: permissions
+                X-Access-Token: access_token
+                X-ID-Token: id_token
+                X-Userinfo: userinfo 

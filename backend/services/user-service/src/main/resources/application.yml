@@ -1,0 +1,49 @@
+server:
+  port: ${PORT:8083}
+
+spring:
+  config:
+    import: "optional:consul:"
+  application:
+    name: user-service
+  datasource:
+    url: jdbc:postgresql://ep-orange-lake-a1yjs4kh-pooler.ap-southeast-1.aws.neon.tech:5432/neondb
+    username: neondb_owner
+    password: npg_oqz9c2nvXjRC
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 600000
+      connection-timeout: 20000
+      connection-test-query: SELECT 1
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://dev-vihsigx84vhnlzvg.us.auth0.com/
+
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        service-name: ${spring.application.name}
+        instance-id: ${spring.application.name}
+        health-check-path: /actuator/health
+        health-check-interval: 15s
+
+auth0:
+  audience: http://localhost:80
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

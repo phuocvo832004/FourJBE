@@ -1,0 +1,314 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  # User Service
+  - name: user-service
+    url: http://user-service:8081
+    routes:
+      - name: user-profile-route
+        paths:
+          - /api/users/profile
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+      
+      - name: user-admin-route
+        paths:
+          - /api/users/admin
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+
+  # Order Service
+  - name: order-service
+    url: http://order-service:8083
+    routes:
+      - name: order-route
+        paths:
+          - /api/orders
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+      
+      - name: order-admin-route
+        paths:
+          - /api/orders/admin
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+      
+      - name: order-seller-route
+        paths:
+          - /api/orders/seller
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+      
+      - name: webhook-payment
+        paths:
+          - /api/payments/webhook
+        strip_path: false
+        preserve_host: false
+        # Không cần plugin OIDC cho webhook
+      
+      - name: checkout-route
+        paths:
+          - /checkout
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+
+  # Product Service
+  - name: product-service
+    url: http://product-service:8084
+    routes:
+      - name: product-public-route
+        paths:
+          - /api/products
+        strip_path: false
+        preserve_host: false
+        # Không cần plugin OIDC cho public route
+      
+      - name: product-admin-route
+        paths:
+          - /api/products/admin
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+      
+      - name: product-seller-route
+        paths:
+          - /api/products/seller
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+      
+      - name: categories-route
+        paths:
+          - /api/categories
+        strip_path: false
+        preserve_host: false
+        # Không cần plugin OIDC cho categories public
+
+  # Cart Service
+  - name: cart-service
+    url: http://cart-service:8085
+    routes:
+      - name: cart-route
+        paths:
+          - /api/cart
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+
+  # Search Service
+  - name: search-service
+    url: http://search-service:8086
+    routes:
+      - name: search-route
+        paths:
+          - /api/search
+        strip_path: false
+        preserve_host: false
+        # Không cần plugin OIDC cho search public
+
+  # IAM Service
+  - name: iam-service
+    url: http://iam-service:8082
+    routes:
+      - name: iam-route
+        paths:
+          - /api/iam
+        strip_path: false
+        preserve_host: false
+        plugins:
+          - name: oidc
+            config:
+              client_id: ${AUTH0_CLIENT_ID}
+              client_secret: ${AUTH0_CLIENT_SECRET}
+              discovery: https://${AUTH0_DOMAIN}/.well-known/openid-configuration
+              scope: openid profile email
+              bearer_only: "yes"
+              realm: kong
+              ssl_verify: "no"
+              session_secret: ${SESSION_SECRET}
+              upstream_headers:
+                X-User-ID: sub
+                X-Userinfo: userinfo
+                X-User-Permissions: permissions
+
+  # Recommendation Service
+  - name: recommendation-service
+    url: http://recommendation-service:8090
+    routes:
+      - name: recommendation-route
+        paths:
+          - /api/v1/recommendations
+        strip_path: false
+        preserve_host: false
+        # Không cần plugin OIDC cho recommendations public
+
+# Cấu hình global plugins nếu muốn áp dụng cho tất cả các services
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+        - PATCH
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-MD5
+        - Content-Type
+        - Date
+        - X-Auth-Token
+        - Authorization
+        - Origin
+        - X-Requested-With
+        - Access-Control-Request-Method
+        - Access-Control-Request-Headers
+      exposed_headers:
+        - X-Auth-Token
+        - Authorization
+        - Content-Type
+        - Access-Control-Allow-Origin
+        - Access-Control-Allow-Methods
+        - Access-Control-Allow-Headers
+        - Access-Control-Allow-Credentials
+      credentials: true
+      max_age: 3600
+      preflight_continue: true 

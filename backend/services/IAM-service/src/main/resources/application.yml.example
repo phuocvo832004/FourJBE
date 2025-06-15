@@ -1,0 +1,85 @@
+server:
+  port: 8082
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: never
+    include-exception: false
+  servlet:
+    context-path: /api/iam
+
+spring:
+  config:
+    import: "optional:consul:"
+  application:
+    name: iam-service
+  datasource:
+    url: jdbc:postgresql://your-postgresql-host:5432/your-database
+    username: your_username
+    password: your_password
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 600000
+      connection-timeout: 20000
+      connection-test-query: SELECT 1
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:consul}
+      port: 8500
+      discovery:
+        instanceId: ${spring.application.name}
+        healthCheckPath: ${server.servlet.context-path}/actuator/health
+        healthCheckInterval: 15s
+        register: true
+        deregister: true
+        service-name: ${spring.application.name}
+        prefer-ip-address: true
+        register-health-check: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: https://${auth0.domain}/.well-known/jwks.json
+          audiences: ${auth0.audience}
+          issuer-uri: https://${auth0.domain}/
+  web:
+    resources:
+      add-mappings: false
+
+auth0:
+  domain: ${AUTH0_DOMAIN:your-auth0-domain.us.auth0.com}
+  clientId: ${AUTH0_CLIENT_ID:your-client-id}
+  clientSecret: ${AUTH0_CLIENT_SECRET:your-client-secret}
+  audience: ${AUTH0_AUDIENCE:http://localhost:80}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+      access: read_only
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    com.fourj.iamservice: DEBUG
+    org.hibernate: INFO 

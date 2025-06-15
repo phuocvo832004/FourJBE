@@ -1,0 +1,49 @@
+server:
+  port: ${PORT:8085}
+
+spring:
+  config:
+    import: "optional:consul:"
+  application:
+    name: cart-service
+  datasource:
+    url: jdbc:postgresql://your-postgresql-host:5432/your-database
+    username: your_username
+    password: your_password
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 600000
+      connection-timeout: 20000
+      connection-test-query: SELECT 1
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://your-auth0-domain.auth0.com/
+
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        service-name: ${spring.application.name}
+        instance-id: ${spring.application.name}
+        health-check-path: /actuator/health
+        health-check-interval: 15s
+
+auth0:
+  audience: http://localhost:80
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info 

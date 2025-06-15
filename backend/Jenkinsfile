@@ -1,0 +1,256 @@
+pipeline {
+    agent {
+        label 'Java-Maven-Docker-Agent'
+    }
+
+    tools {
+        maven 'Maven3'
+    }
+
+    environment {
+        DOCKER_REGISTRY = 'docker.io'
+        DOCKER_HOST = 'tcp://localhost:2375'
+        DOCKER_CREDENTIALS_ID = 'docker-hub-credentials'
+        MICROSERVICES = ''
+        USER_SERVICE_PORT = '8083'
+        PRODUCT_SERVICE_PORT = '8084' 
+        CART_SERVICE_PORT = '8085'
+        ORDER_SERVICE_PORT = '8086' 
+        SEARCH_SERVICE_PORT = '8087' 
+        AUTH0_DOMAIN = 'dev-vihsigx84vhnlzvg.us.auth0.com'
+        AUTH0_AUDIENCE = 'http://localhost:80'
+        KONG_DB_PASSWORD = 'admin'
+    }
+
+    stages {
+        
+        stage('Build') {
+            steps {
+                bat 'mvn clean install'
+            }
+        }
+        stage('Discover Microservices') {
+            steps {
+                echo 'Discovering microservices in backend/services/...'
+                script {
+                    // Sử dụng PowerShell để liệt kê tất cả các thư mục con trong 'services/'
+                    // trừ thư mục '.idea/' và chuyển kết quả thành một chuỗi cách nhau bởi dấu cách.
+                    def microservices = bat(returnStdout: true, script: '''
+                        powershell -Command "Get-ChildItem -Directory services | Where-Object { $_.Name -ne '.idea' } | ForEach-Object { $_.Name }"
+                    ''').trim().replaceAll('\r\n', ' ').replaceAll('\n', ' ')
+                    env.MICROSERVICES = microservices
+
+                    echo "Discovered microservices: ${env.MICROSERVICES}"
+
+                    // Kiểm tra nếu không tìm thấy microservice nào
+                    if (env.MICROSERVICES.trim() == '') {
+                        error('No microservices found in backend/services/. Please check the directory structure.')
+                    }
+                }
+            }
+        }
+
+        stage('Build and Test All Microservices') {
+            steps {
+                script {
+                    def services = env.MICROSERVICES.split(' ').findAll { it != '' } // Tách chuỗi thành danh sách và lọc bỏ khoảng trắng thừa
+                    if (services.isEmpty()) {
+                        error('No microservices to build or test. Aborting.')
+                    }
+
+                    for (int i = 0; i < services.size(); i++) {
+                        def serviceName = services[i]
+                        echo "--- Processing microservice: ${serviceName} ---"
+                        dir("services/${serviceName}") {
+                            echo "Building ${serviceName} (Maven)..."
+                            bat 'mvn clean install -Dmaven.test.skip=true'
+
+                            echo "Running Unit Tests for ${serviceName}..."
+                            bat 'mvn test'
+                            junit 'target/surefire-reports/*.xml'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build and Push Docker Images') {
+            steps {
+                script {
+                    def services = env.MICROSERVICES.split(' ').findAll { it != '' }
+                    if (services.isEmpty()) {
+                        error('No microservices to build Docker images for. Aborting.')
+                    }
+
+                    for (int i = 0; i < services.size(); i++) {
+                        def serviceName = services[i]
+                        echo "--- Building and pushing Docker image for ${serviceName} ---"
+                        dir("services/${serviceName}") {
+                            def appVersion = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout').trim()
+                            echo "Building Docker image: ${env.DOCKER_REGISTRY}/${serviceName}:${appVersion}-${env.BUILD_NUMBER}"
+                            def image = docker.build("${env.DOCKER_REGISTRY}/${serviceName}:${appVersion}-${env.BUILD_NUMBER}")
+                            echo "Pushing Docker image ${image.id} to registry..."
+                            docker.withRegistry("https://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS_ID) {
+                                image.push()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Docker') {
+            steps {
+                echo 'Deploying all microservices to Docker...'
+                script {
+                    def services = env.MICROSERVICES.split(' ').findAll { it != '' }
+                    if (services.isEmpty()) {
+                        echo 'No microservices to deploy.'
+                        return
+                    }
+
+                    // Định nghĩa cấu hình triển khai cho từng microservice
+                    def serviceConfigs = [
+                        'iam-service': [
+                            ports: '8082:8082',
+                            env: [
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=8082",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'user-service': [
+                            ports: "${env.USER_SERVICE_PORT}:${env.USER_SERVICE_PORT}",
+                            env: [
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=${env.USER_SERVICE_PORT}",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'product-service': [
+                            ports: "${env.PRODUCT_SERVICE_PORT}:${env.PRODUCT_SERVICE_PORT}",
+                            env: [
+                                "KAFKA_SERVERS=kafka:9092",
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=${env.PRODUCT_SERVICE_PORT}",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'cart-service': [
+                            ports: "${env.CART_SERVICE_PORT}:${env.CART_SERVICE_PORT}",
+                            env: [
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=${env.CART_SERVICE_PORT}",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500",
+                                "SPRING_RABBITMQ_HOST=rabbitmq",
+                                "SPRING_RABBITMQ_PORT=5672",
+                                "SPRING_RABBITMQ_USERNAME=guest",
+                                "SPRING_RABBITMQ_PASSWORD=guest"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'order-service': [
+                            ports: "${env.ORDER_SERVICE_PORT}:${env.ORDER_SERVICE_PORT}",
+                            env: [
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=${env.ORDER_SERVICE_PORT}",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500",
+                                "SPRING_RABBITMQ_HOST=rabbitmq",
+                                "SPRING_RABBITMQ_PORT=5672",
+                                "SPRING_RABBITMQ_USERNAME=guest",
+                                "SPRING_RABBITMQ_PASSWORD=guest",
+                                "KAFKA_BOOTSTRAP_SERVERS=kafka:9092",
+                                "ORDER_CREATED_TOPIC=order_created_topic"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'search-service': [
+                            ports: "${env.SEARCH_SERVICE_PORT}:${env.SEARCH_SERVICE_PORT}",
+                            env: [
+                                "SPRING_APPLICATION_NAME=search-service",
+                                "SERVER_PORT=${env.SEARCH_SERVICE_PORT}",
+                                "ES_HOST=elasticsearch",
+                                "ES_PORT=9200",
+                                "REDIS_HOST=redis",
+                                "REDIS_PORT=6379",
+                                "KAFKA_SERVERS=kafka:9092",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'recommendation-service': [
+                            ports: "8090:8090",
+                            env: [
+                                "SERVICE_PORT=8090",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500",
+                                "KAFKA_BOOTSTRAP_SERVERS=kafka:9092",
+                                "ORDER_CREATED_TOPIC=order_created_topic",
+                                "AZURE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=orderhistoryfourj;AccountKey=AKWOHHSM2KRbQkaLtJYUIQHEwb3Sz+YG1ey+laONUUwdHuDScG/oDIkZuBlp73HHmNucEl83wn/l+AStbb2w8w==;EndpointSuffix=core.windows.net",
+                                "USE_AZURE_STORAGE=true",
+                                "COSMOS_ENDPOINT=https://fourjpredictmodel.documents.azure.com:443/",
+                                "COSMOS_KEY=ebAXWVrkreQcKanNWYNDp2X60B1i0r383JuAZ4q93MXXwXyPjWpVhD9icP7KfbPw6Er9o9DJHKRdACDb2Vhegg==",
+                                "COSMOS_DATABASE_NAME=RecommendationDB",
+                                "COSMOS_MODELS_CONTAINER_NAME=Models"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ]
+                    ]
+
+                    for (int i = 0; i < services.size(); i++) {
+                        def serviceName = services[i]
+                        def config = serviceConfigs[serviceName]
+                        if (config) {
+                            echo "--- Initiating deployment for ${serviceName} ---"
+                            dir("services/${serviceName}") {
+                                def appVersion = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout').trim()
+                                def imageTag = "${env.DOCKER_REGISTRY}/${serviceName}:${appVersion}-${env.BUILD_NUMBER}"
+                                echo "Deploying ${serviceName} with Docker image: ${imageTag}"
+                                bat "docker stop ${serviceName} || exit 0"
+                                bat "docker rm ${serviceName} || exit 0"
+                                bat "docker pull ${imageTag}"
+                                def portMapping = config.ports ? "-p ${config.ports}" : ""
+                                def envVars = config.env ? config.env.collect { "-e ${it}" }.join(' ') : ""
+                                def networks = config.networks ? config.networks.collect { "--network ${it}" }.join(' ') : ""
+                                bat "docker run -d --name ${serviceName} ${portMapping} ${envVars} ${networks} ${imageTag}"
+                                echo "Container ${serviceName} started with image ${imageTag}"
+                            }
+                        } else {
+                            echo "WARNING: No specific Docker deployment configuration found for ${serviceName}. Skipping deployment for this service."
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        // Các hành động được thực hiện sau khi toàn bộ pipeline hoàn thành
+        always {
+            echo 'Overall backend CI/CD pipeline finished.'
+        }
+        success {
+            echo 'Overall backend CI/CD pipeline succeeded!'
+        }
+        failure {
+            echo 'Overall backend CI/CD pipeline failed!'
+        }
+        unstable {
+            echo 'Overall backend CI/CD pipeline is unstable (e.g., some tests failed).'
+        }
+    }
+}
