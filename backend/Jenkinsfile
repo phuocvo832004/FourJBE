@@ -88,7 +88,8 @@ pipeline {
                         def serviceName = services[i]
                         echo "--- Building and pushing Docker image for ${serviceName} ---"
                         dir("backend/services/${serviceName}") {
-                            def appVersion = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout').trim()
+                            def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
+                            def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
                             def imageName = "${env.DOCKER_REGISTRY}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
                             echo "Building Docker image: ${imageName}"
                             def image = docker.build(imageName)
@@ -203,7 +204,8 @@ pipeline {
                         if (config) {
                             echo "--- Initiating deployment for ${serviceName} ---"
                             dir("backend/services/${serviceName}") {
-                                def appVersion = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout').trim()
+                                def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
+                                def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
                                 def imageName = "${env.DOCKER_REGISTRY}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
                                 echo "Deploying ${serviceName} with Docker image: ${imageName}"
                                 bat "docker stop ${serviceName} || exit 0"
