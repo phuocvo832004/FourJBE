@@ -63,7 +63,7 @@ pipeline {
                     for (int i = 0; i < services.size(); i++) {
                         def serviceName = services[i]
                         echo "--- Processing microservice: ${serviceName} ---"
-                        dir("services/${serviceName}") {
+                        dir("backend/services/${serviceName}") {
                             echo "Building ${serviceName} (Maven)..."
                             bat 'mvn clean install -Dmaven.test.skip=true'
 
@@ -87,7 +87,7 @@ pipeline {
                     for (int i = 0; i < services.size(); i++) {
                         def serviceName = services[i]
                         echo "--- Building and pushing Docker image for ${serviceName} ---"
-                        dir("services/${serviceName}") {
+                        dir("backend/services/${serviceName}") {
                             def appVersion = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout').trim()
                             echo "Building Docker image: ${env.DOCKER_REGISTRY}/${serviceName}:${appVersion}-${env.BUILD_NUMBER}"
                             def image = docker.build("${env.DOCKER_REGISTRY}/${serviceName}:${appVersion}-${env.BUILD_NUMBER}")
@@ -201,7 +201,7 @@ pipeline {
                         def config = serviceConfigs[serviceName]
                         if (config) {
                             echo "--- Initiating deployment for ${serviceName} ---"
-                            dir("services/${serviceName}") {
+                            dir("backend/services/${serviceName}") {
                                 def appVersion = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout').trim()
                                 def imageTag = "${env.DOCKER_REGISTRY}/${serviceName}:${appVersion}-${env.BUILD_NUMBER}"
                                 echo "Deploying ${serviceName} with Docker image: ${imageTag}"
