@@ -1,3 +1,5 @@
+def microservices = ''
+
 pipeline {
     agent {
         label 'Java-Maven-Docker-Agent'
@@ -28,7 +30,7 @@ pipeline {
             steps {
                 echo 'Discovering microservices in backend/services/...'
                 script {
-                    def microservices = bat(returnStdout: true, script: '''
+                    microservices = bat(returnStdout: true, script: '''
                         powershell -Command "if (Test-Path backend/services) { Get-ChildItem -Directory backend/services | Where-Object { $_.Name -ne '.idea' } | ForEach-Object { $_.Name } }"
                     ''')
                     if (microservices == null) {
@@ -53,7 +55,7 @@ pipeline {
         stage('Build and Test All Microservices') {
             steps {
                 script {
-                    def services = env.MICROSERVICES.split(' ').findAll { it != '' }
+                    def services = microservices.split(' ').findAll { it != '' }
                     if (services.isEmpty()) {
                         error('No microservices to build or test. Aborting.')
                     }
@@ -77,7 +79,7 @@ pipeline {
         stage('Build and Push Docker Images') {
             steps {
                 script {
-                    def services = env.MICROSERVICES.split(' ').findAll { it != '' }
+                    def services = microservices.split(' ').findAll { it != '' }
                     if (services.isEmpty()) {
                         error('No microservices to build Docker images for. Aborting.')
                     }
@@ -103,7 +105,7 @@ pipeline {
             steps {
                 echo 'Deploying all microservices to Docker...'
                 script {
-                    def services = env.MICROSERVICES.split(' ').findAll { it != '' }
+                    def services = microservices.split(' ').findAll { it != '' }
                     if (services.isEmpty()) {
                         echo 'No microservices to deploy.'
                         return
