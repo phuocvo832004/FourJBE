@@ -28,11 +28,13 @@ pipeline {
             steps {
                 echo 'Discovering microservices in backend/services/...'
                 script {
-
                     def microservices = bat(returnStdout: true, script: '''
-                        powershell -Command "Get-ChildItem -Directory backend/services | Where-Object { $_.Name -ne '.idea' } | ForEach-Object { $_.Name }"
-                    ''').trim().replaceAll('\r\n', ' ').replaceAll('\n', ' ')
-                    env.MICROSERVICES = microservices
+                        powershell -Command "if (Test-Path backend/services) { Get-ChildItem -Directory backend/services | Where-Object { $_.Name -ne '.idea' } | ForEach-Object { $_.Name } }"
+                    ''').trim()
+                    if (microservices == null) {
+                        microservices = ''
+                    }
+                    env.MICROSERVICES = microservices.replaceAll('\r\n', ' ').replaceAll('\n', ' ')
 
                     echo "Discovered microservices: ${env.MICROSERVICES}"
 
