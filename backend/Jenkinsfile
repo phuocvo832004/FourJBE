@@ -89,8 +89,9 @@ pipeline {
                         echo "--- Building and pushing Docker image for ${serviceName} ---"
                         dir("backend/services/${serviceName}") {
                             def appVersion = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout').trim()
-                            echo "Building Docker image: ${env.DOCKER_REGISTRY}/${serviceName}:${appVersion}-${env.BUILD_NUMBER}"
-                            def image = docker.build("${env.DOCKER_REGISTRY}/${serviceName}:${appVersion}-${env.BUILD_NUMBER}")
+                            def imageName = "${env.DOCKER_REGISTRY}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
+                            echo "Building Docker image: ${imageName}"
+                            def image = docker.build(imageName)
                             echo "Pushing Docker image ${image.id} to registry..."
                             docker.withRegistry("https://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS_ID) {
                                 image.push()
@@ -203,16 +204,16 @@ pipeline {
                             echo "--- Initiating deployment for ${serviceName} ---"
                             dir("backend/services/${serviceName}") {
                                 def appVersion = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout').trim()
-                                def imageTag = "${env.DOCKER_REGISTRY}/${serviceName}:${appVersion}-${env.BUILD_NUMBER}"
-                                echo "Deploying ${serviceName} with Docker image: ${imageTag}"
+                                def imageName = "${env.DOCKER_REGISTRY}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
+                                echo "Deploying ${serviceName} with Docker image: ${imageName}"
                                 bat "docker stop ${serviceName} || exit 0"
                                 bat "docker rm ${serviceName} || exit 0"
-                                bat "docker pull ${imageTag}"
+                                bat "docker pull ${imageName}"
                                 def portMapping = config.ports ? "-p ${config.ports}" : ""
                                 def envVars = config.env ? config.env.collect { "-e ${it}" }.join(' ') : ""
                                 def networks = config.networks ? config.networks.collect { "--network ${it}" }.join(' ') : ""
-                                bat "docker run -d --name ${serviceName} ${portMapping} ${envVars} ${networks} ${imageTag}"
-                                echo "Container ${serviceName} started with image ${imageTag}"
+                                bat "docker run -d --name ${serviceName} ${portMapping} ${envVars} ${networks} ${imageName}"
+                                echo "Container ${serviceName} started with image ${imageName}"
                             }
                         } else {
                             echo "WARNING: No specific Docker deployment configuration found for ${serviceName}. Skipping deployment for this service."
