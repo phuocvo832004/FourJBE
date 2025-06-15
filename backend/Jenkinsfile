@@ -241,8 +241,10 @@ pipeline {
                     def services = ['user-service', 'search-service', 'product-service', 'cart-service', 'order-service', 'iam-service']
                     for (service in services) {
                         dir("backend/services/${service}") {
-                            withSonarQubeEnv("${SONARQUBE_ENV}") {
-                                bat "mvn sonar:sonar"
+                            withSonarQubeEnv('SonarQubeServer') {
+                                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                                    bat "mvn sonar:sonar -Dsonar.token=${SONAR_TOKEN}"
+                                }
                             }
                         }
                     }
