@@ -268,8 +268,9 @@ pipeline {
                 }
             }
         }
-    
+    }
 
+    
     post {
         // Các hành động được thực hiện sau khi toàn bộ pipeline hoàn thành
         always {
@@ -285,4 +286,4 @@ pipeline {
             echo 'Overall backend CI/CD pipeline is unstable (e.g., some tests failed).'
         }
     }
-}}
+}
