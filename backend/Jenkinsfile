@@ -35,11 +35,11 @@ pipeline {
                         microservices = ''
                     } else {
                         def lines = microservices.readLines()
-                        lines = lines.findAll { !(it =~ /^C:.*>|^powershell\s*-Command/) && it.trim() != '' }
+                        lines = lines.findAll { !(it =~ /^C:.*>|^powershell\\s*-Command/) && it.trim() != '' }
                         microservices = lines.join(' ')
                     }
                     echo "Filtered microservices: '${microservices}'"
-                    env.MICROSERVICES = microservices
+                    env.MICROSERVICES = "${microservices}"
 
                     echo "Discovered microservices: ${env.MICROSERVICES}"
 
