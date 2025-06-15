@@ -43,6 +43,9 @@ pipeline {
                     if (microservices.trim() == '') {
                         error('No microservices found in backend/services/. Please check the directory structure.')
                     }
+
+                    // Gán lại vào env để các stage sau dùng được
+                    env.MICROSERVICES = "${microservices}"
                 }
             }
         }
