@@ -22,6 +22,7 @@ pipeline {
         AUTH0_DOMAIN = 'dev-vihsigx84vhnlzvg.us.auth0.com'
         AUTH0_AUDIENCE = 'http://localhost:80'
         KONG_DB_PASSWORD = 'admin'
+        DOCKER_HUB_USERNAME = 'phuocvo832004'
     }
 
     stages {
@@ -90,7 +91,7 @@ pipeline {
                         dir("backend/services/${serviceName}") {
                             def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
                             def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
-                            def imageName = "${env.DOCKER_REGISTRY}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
+                            def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
                             echo "Building Docker image: ${imageName}"
                             def image = docker.build(imageName)
                             echo "Pushing Docker image ${image.id} to registry..."
@@ -206,7 +207,7 @@ pipeline {
                             dir("backend/services/${serviceName}") {
                                 def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
                                 def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
-                                def imageName = "${env.DOCKER_REGISTRY}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
+                                def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
                                 echo "Deploying ${serviceName} with Docker image: ${imageName}"
                                 bat "docker stop ${serviceName} || exit 0"
                                 bat "docker rm ${serviceName} || exit 0"
