@@ -243,7 +243,7 @@ pipeline {
                         dir("backend/services/${service}") {
                             withSonarQubeEnv('SonarQubeServer') {
                                 withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-                                    bat "mvn sonar:sonar -Dsonar.token=${SONAR_TOKEN}"
+                                    bat 'mvn sonar:sonar -Dsonar.token=$SONAR_TOKEN'
                                 }
                             }
                         }
@@ -258,15 +258,17 @@ pipeline {
                     def services = microservices.split(' ').findAll { it != '' }
                     for (int i = 0; i < services.size(); i++) {
                         def serviceName = services[i]
-                        def appVersionRaw = bat(returnStdout: true, script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout")
-                        def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
-                        def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
-                        bat "trivy image ${imageName}"
+                        dir("backend/services/${serviceName}") {
+                            def appVersionRaw = bat(returnStdout: true, script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout")
+                            def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
+                            def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
+                            bat "trivy image ${imageName}"
+                        }
                     }
                 }
             }
         }
-    }
+
 
     post {
         // Các hành động được thực hiện sau khi toàn bộ pipeline hoàn thành
