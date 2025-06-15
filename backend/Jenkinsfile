@@ -24,11 +24,6 @@ pipeline {
 
     stages {
         
-        stage('Build') {
-            steps {
-                bat 'mvn clean install'
-            }
-        }
         stage('Discover Microservices') {
             steps {
                 echo 'Discovering microservices in backend/services/...'
