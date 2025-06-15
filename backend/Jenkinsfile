@@ -14,6 +14,7 @@ pipeline {
         DOCKER_HOST = 'tcp://localhost:2375'
         DOCKER_CREDENTIALS_ID = 'docker-hub-credentials'
         MICROSERVICES = ''
+        IAM_SERVICE_PORT = '8082'
         USER_SERVICE_PORT = '8083'
         PRODUCT_SERVICE_PORT = '8084' 
         CART_SERVICE_PORT = '8085'
@@ -23,6 +24,7 @@ pipeline {
         AUTH0_AUDIENCE = 'http://localhost:80'
         KONG_DB_PASSWORD = 'admin'
         DOCKER_HUB_USERNAME = 'phuocvo832004'
+        SONARQUBE_ENV = 'SonarQubeServer'
     }
 
     stages {
@@ -235,8 +237,15 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQubeServer') {
-                    bat 'mvn sonar:sonar'
+                script {
+                    def services = ['user-service', 'search-service', 'product-service', 'cart-service', 'order-service', 'iam-service']
+                    for (service in services) {
+                        dir("backend/services/${service}") {
+                            withSonarQubeEnv("${SONARQUBE_ENV}") {
+                                sh "mvn sonar:sonar"
+                            }
+                        }
+                    }
                 }
             }
         }
