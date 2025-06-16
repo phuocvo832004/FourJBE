@@ -63,93 +63,178 @@ The system consists of:
      SEARCH_SERVICE_PORT=8087
      DOCKER_HUB_USERNAME=
      ```
+## CI/CD Pipeline Setup
 
-## Deployment
-1. **Start the System**:
-   ```bash
-   cd docker
-   docker compose up --build
-   ```
+### Prerequisites for CI/CD
+- **Jenkins Server**: Latest LTS version
+- **Java 17**: For Jenkins agent
+- **Maven 3.x**: For building services
+- **Docker**: For containerization
+- **SonarQube**: For code quality analysis
+- **Trivy**: For container security scanning
 
-2. **Monitor Deployment**:
-   - Check container status:
-     ```bash
-     docker ps
+### Jenkins Environment Setup
+1. **Install Required Jenkins Plugins**:
+   - Docker Pipeline
+   - SonarQube Scanner
+   - Git Integration
+   - Pipeline: GitHub
+   - Credentials Binding
+
+2. **Configure Jenkins Credentials**:
+   - Add Docker Hub credentials:
      ```
-   - View service logs:
-     ```bash
-     docker logs <service-name>
+     ID: docker-hub-credentials
+     Username: <your-dockerhub-username>
+     Password: <your-dockerhub-password>
      ```
-
-3. **Access Services**:
-   - API Gateway: http://localhost:8000
-   - Consul UI: http://localhost:8500
-   - RabbitMQ UI: http://localhost:15672 (guest/guest)
-   - Elasticsearch: http://localhost:9200
-   - Konga: http://localhost:1337
-
-4. **Verify Health**:
-   ```bash
-   curl http://localhost:8083/actuator/health
-   ```
-
-## Development (Optional)
-1. **Build Individual Services**:
-   ```bash
-   cd services/<service-name>
-   mvn clean install
-   ```
-
-2. **Update Service**:
-   - Modify code
-   - Rebuild service
-   - Restart container:
-     ```bash
-     docker compose restart <service-name>
+   - Add SonarQube token:
+     ```
+     ID: SONAR_TOKEN
+     Token: <your-sonarqube-token>
      ```
 
-## Maintenance
-1. **Stop the System**:
-   ```bash
-   docker compose down
-   ```
+3. **Configure Jenkins Tools**:
+   - Add Maven installation:
+     ```
+     Name: Maven3
+     Version: 3.x
+     ```
+   - Add SonarQube server:
+     ```
+     Name: SonarQubeServer
+     Server URL: <your-sonarqube-url>
+     ```
 
-2. **Clean Up**:
-   ```bash
-   docker compose down -v
-   ```
+### Pipeline Configuration
+1. **Create New Pipeline**:
+   - Go to Jenkins Dashboard
+   - Click "New Item"
+   - Enter pipeline name (e.g., "FourJBE-Backend")
+   - Select "Pipeline"
+   - Click "OK"
 
-## Troubleshooting
-- **Port Conflicts**:
-  - Ensure ports 8082-8087, 8000, 8500, 15672, 9200 are available
-  - Check running containers: `docker ps`
+2. **Configure Pipeline**:
+   - In Pipeline configuration:
+     - Definition: Pipeline script from SCM
+     - SCM: Git
+     - Repository URL: <your-repo-url>
+     - Branch: */main
+     - Script Path: backend/Jenkinsfile
 
-- **Service Startup Issues**:
-  - Check logs: `docker logs <service-name>`
-  - Verify environment variables in `.env`
-  - Ensure all required services are running
+### Running the Pipeline
+1. **Manual Trigger**:
+   - Go to pipeline page
+   - Click "Build Now"
 
-- **Connection Problems**:
-  - Verify network connectivity between services
-  - Check Consul service registration
-  - Validate Kong routes configuration
+2. **Automatic Trigger**:
+   - Configure webhook in repository
+   - Pipeline will trigger on push to main branch
 
-## Best Practices
-- **Security**: 
-  - Change default passwords
-  - Use secure environment variables
-  - Enable authentication for all services
+### Pipeline Stages
+The pipeline executes the following stages:
 
-- **Monitoring**:
-  - Enable health checks
-  - Set up logging
-  - Monitor service metrics
+1. **Discover Microservices**:
+   - Scans `backend/services/` directory
+   - Identifies all microservices
+   - Sets environment variables
 
-- **Backup**:
-  - Regularly backup databases
-  - Maintain service configurations
-  - Version control all changes
+2. **Build and Test**:
+   - Builds each microservice using Maven
+   - Runs unit tests
+   - Generates test reports
 
+3. **Build and Push Docker Images**:
+   - Builds Docker images for each service
+   - Pushes images to Docker Hub
+   - Tags images with version and build number
+
+4. **Prepare Docker Networks**:
+   - Creates required Docker networks
+   - Ensures network connectivity
+
+5. **Deploy to Docker**:
+   - Deploys all microservices
+   - Configures environment variables
+   - Sets up service dependencies
+
+6. **SonarQube Analysis**:
+   - Performs code quality analysis
+   - Generates quality reports
+   - Enforces quality gates
+
+7. **Security Scan**:
+   - Scans Docker images using Trivy
+   - Identifies security vulnerabilities
+   - Generates security reports
+
+### Monitoring Pipeline Execution
+1. **View Pipeline Status**:
+   - Go to pipeline page
+   - Click on build number
+   - View stage execution status
+
+2. **Check Build Logs**:
+   - Click on any stage
+   - View detailed execution logs
+   - Download build artifacts
+
+3. **View Test Results**:
+   - Go to "Test Results" section
+   - View test reports
+   - Check test coverage
+
+4. **Access Quality Reports**:
+   - Go to SonarQube dashboard
+   - View code quality metrics
+   - Check security vulnerabilities
+
+### Troubleshooting CI/CD
+1. **Build Failures**:
+   - Check Maven build logs
+   - Verify dependencies
+   - Check Java version compatibility
+
+2. **Docker Issues**:
+   - Verify Docker daemon is running
+   - Check Docker Hub credentials
+   - Ensure sufficient disk space
+
+3. **SonarQube Problems**:
+   - Verify SonarQube server is running
+   - Check token permissions
+   - Validate project configuration
+
+4. **Deployment Issues**:
+   - Check Docker network configuration
+   - Verify environment variables
+   - Check service dependencies
+
+### Best Practices for CI/CD
+1. **Code Quality**:
+   - Maintain high test coverage
+   - Follow coding standards
+   - Regular code reviews
+
+2. **Security**:
+   - Regular security scans
+   - Update dependencies
+   - Secure credentials
+
+3. **Monitoring**:
+   - Monitor pipeline performance
+   - Track build times
+   - Analyze failure patterns
+
+4. **Maintenance**:
+   - Regular pipeline updates
+   - Clean up old builds
+   - Update Jenkins plugins
+
+For detailed documentation, refer to:
+- [Jenkins Documentation](https://www.jenkins.io/doc/)
+- [SonarQube Documentation](https://docs.sonarqube.org/)
+- [Trivy Documentation](https://aquasecurity.github.io/trivy/)
 For detailed documentation, refer to:
 - [Docker Documentation](https://docs.docker.com)
 - [Kong Documentation](https://docs.konghq.com)
