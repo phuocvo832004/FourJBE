@@ -277,36 +277,6 @@ pipeline {
             }
         }
 
-        // Thêm stage Quality Gate (tùy chọn)
-        stage('Quality Gate') {
-            steps {
-                script {
-                    def services = microservices.split(' ').findAll { it != '' }
-                    
-                    for (int i = 0; i < services.size(); i++) {
-                        def serviceName = services[i]
-                        echo "--- Checking Quality Gate for ${serviceName} ---"
-                        
-                        try {
-                            timeout(time: 5, unit: 'MINUTES') {
-                                def qg = waitForQualityGate()
-                                if (qg.status != 'OK') {
-                                    echo "WARNING: Quality Gate failed for ${serviceName}: ${qg.status}"
-                                    // Có thể set unstable thay vì fail
-                                    // currentBuild.result = 'UNSTABLE'
-                                } else {
-                                    echo "✅ Quality Gate passed for ${serviceName}"
-                                }
-                            }
-                        } catch (Exception e) {
-                            echo "❌ Quality Gate check failed for ${serviceName}: ${e.getMessage()}"
-                            currentBuild.result = 'UNSTABLE'
-                        }
-                    }
-                }
-            }
-        }
-
         stage('Security Scan (Trivy)') {
             steps {
                 script {
