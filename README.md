@@ -235,7 +235,6 @@ For detailed documentation, refer to:
 - [Jenkins Documentation](https://www.jenkins.io/doc/)
 - [SonarQube Documentation](https://docs.sonarqube.org/)
 - [Trivy Documentation](https://aquasecurity.github.io/trivy/)
-For detailed documentation, refer to:
 - [Docker Documentation](https://docs.docker.com)
 - [Kong Documentation](https://docs.konghq.com)
 - [Consul Documentation](https://www.consul.io/docs)
