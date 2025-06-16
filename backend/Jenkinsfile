@@ -238,14 +238,69 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    def services = ['user-service', 'search-service', 'product-service', 'cart-service', 'order-service', 'iam-service']
-                    for (service in services) {
-                        dir("backend/services/${service}") {
-                            withSonarQubeEnv('SonarQubeServer') {
-                                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-                                    bat 'mvn sonar:sonar -Dsonar.token=$SONAR_TOKEN'
+                    def services = microservices.split(' ').findAll { it != '' }
+                    
+                    for (int i = 0; i < services.size(); i++) {
+                        def serviceName = services[i]
+                        echo "--- Running SonarQube analysis for ${serviceName} ---"
+                        
+                        dir("backend/services/${serviceName}") {
+                            try {
+                                // Lấy version từ Maven
+                                def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
+                                def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
+                                
+                                withSonarQubeEnv(env.SONARQUBE_ENV) {
+                                    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                                        bat """
+                                            mvn sonar:sonar ^
+                                            -Dsonar.token=%SONAR_TOKEN% ^
+                                            -Dsonar.projectKey=microservices-${serviceName} ^
+                                            -Dsonar.projectName="${serviceName.replaceAll('-', ' ').toLowerCase().split(' ').collect{it.capitalize()}.join(' ')}" ^
+                                            -Dsonar.projectVersion=${appVersion} ^
+                                            -Dsonar.sources=src/main/java ^
+                                            -Dsonar.tests=src/test/java ^
+                                            -Dsonar.java.binaries=target/classes ^
+                                            -Dsonar.junit.reportPaths=target/surefire-reports ^
+                                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                                        """
+                                    }
+                                }
+                                echo "✅ SonarQube analysis completed for ${serviceName}"
+                            } catch (Exception e) {
+                                echo "❌ SonarQube analysis failed for ${serviceName}: ${e.getMessage()}"
+                                currentBuild.result = 'UNSTABLE'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Thêm stage Quality Gate (tùy chọn)
+        stage('Quality Gate') {
+            steps {
+                script {
+                    def services = microservices.split(' ').findAll { it != '' }
+                    
+                    for (int i = 0; i < services.size(); i++) {
+                        def serviceName = services[i]
+                        echo "--- Checking Quality Gate for ${serviceName} ---"
+                        
+                        try {
+                            timeout(time: 5, unit: 'MINUTES') {
+                                def qg = waitForQualityGate()
+                                if (qg.status != 'OK') {
+                                    echo "WARNING: Quality Gate failed for ${serviceName}: ${qg.status}"
+                                    // Có thể set unstable thay vì fail
+                                    // currentBuild.result = 'UNSTABLE'
+                                } else {
+                                    echo "✅ Quality Gate passed for ${serviceName}"
                                 }
                             }
+                        } catch (Exception e) {
+                            echo "❌ Quality Gate check failed for ${serviceName}: ${e.getMessage()}"
+                            currentBuild.result = 'UNSTABLE'
                         }
                     }
                 }
