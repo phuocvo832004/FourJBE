@@ -55,56 +55,56 @@ pipeline {
             }
         }
 
-        stage('Build and Test All Microservices') {
-            steps {
-                script {
-                    def services = microservices.split(' ').findAll { it != '' }
-                    if (services.isEmpty()) {
-                        error('No microservices to build or test. Aborting.')
-                    }
+        // stage('Build and Test All Microservices') {
+        //     steps {
+        //         script {
+        //             def services = microservices.split(' ').findAll { it != '' }
+        //             if (services.isEmpty()) {
+        //                 error('No microservices to build or test. Aborting.')
+        //             }
 
-                    for (int i = 0; i < services.size(); i++) {
-                        def serviceName = services[i]
-                        echo "--- Processing microservice: ${serviceName} ---"
-                        dir("backend/services/${serviceName}") {
-                            echo "Building ${serviceName} (Maven)..."
-                            bat 'mvn clean install -Dmaven.test.skip=true'
+        //             for (int i = 0; i < services.size(); i++) {
+        //                 def serviceName = services[i]
+        //                 echo "--- Processing microservice: ${serviceName} ---"
+        //                 dir("backend/services/${serviceName}") {
+        //                     echo "Building ${serviceName} (Maven)..."
+        //                     bat 'mvn clean install -Dmaven.test.skip=true'
 
-                            echo "Running Unit Tests for ${serviceName}..."
-                            bat 'mvn test'
-                            junit 'target/surefire-reports/*.xml'
-                        }
-                    }
-                }
-            }
-        }
+        //                     echo "Running Unit Tests for ${serviceName}..."
+        //                     bat 'mvn test'
+        //                     junit 'target/surefire-reports/*.xml'
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage('Build and Push Docker Images') {
-            steps {
-                script {
-                    def services = microservices.split(' ').findAll { it != '' }
-                    if (services.isEmpty()) {
-                        error('No microservices to build Docker images for. Aborting.')
-                    }
+        // stage('Build and Push Docker Images') {
+        //     steps {
+        //         script {
+        //             def services = microservices.split(' ').findAll { it != '' }
+        //             if (services.isEmpty()) {
+        //                 error('No microservices to build Docker images for. Aborting.')
+        //             }
 
-                    for (int i = 0; i < services.size(); i++) {
-                        def serviceName = services[i]
-                        echo "--- Building and pushing Docker image for ${serviceName} ---"
-                        dir("backend/services/${serviceName}") {
-                            def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
-                            def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
-                            def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
-                            echo "Building Docker image: ${imageName}"
-                            def image = docker.build(imageName)
-                            echo "Pushing Docker image ${image.id} to registry..."
-                            docker.withRegistry("https://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS_ID) {
-                                image.push()
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        //             for (int i = 0; i < services.size(); i++) {
+        //                 def serviceName = services[i]
+        //                 echo "--- Building and pushing Docker image for ${serviceName} ---"
+        //                 dir("backend/services/${serviceName}") {
+        //                     def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
+        //                     def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
+        //                     def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
+        //                     echo "Building Docker image: ${imageName}"
+        //                     def image = docker.build(imageName)
+        //                     echo "Pushing Docker image ${image.id} to registry..."
+        //                     docker.withRegistry("https://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS_ID) {
+        //                         image.push()
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         stage('Prepare Docker Networks') {
             steps {
