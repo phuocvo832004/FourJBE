@@ -55,56 +55,56 @@ pipeline {
             }
         }
 
-        // stage('Build and Test All Microservices') {
-        //     steps {
-        //         script {
-        //             def services = microservices.split(' ').findAll { it != '' }
-        //             if (services.isEmpty()) {
-        //                 error('No microservices to build or test. Aborting.')
-        //             }
+        stage('Build and Test All Microservices') {
+            steps {
+                script {
+                    def services = microservices.split(' ').findAll { it != '' }
+                    if (services.isEmpty()) {
+                        error('No microservices to build or test. Aborting.')
+                    }
 
-        //             for (int i = 0; i < services.size(); i++) {
-        //                 def serviceName = services[i]
-        //                 echo "--- Processing microservice: ${serviceName} ---"
-        //                 dir("backend/services/${serviceName}") {
-        //                     echo "Building ${serviceName} (Maven)..."
-        //                     bat 'mvn clean install -Dmaven.test.skip=true'
+                    for (int i = 0; i < services.size(); i++) {
+                        def serviceName = services[i]
+                        echo "--- Processing microservice: ${serviceName} ---"
+                        dir("backend/services/${serviceName}") {
+                            echo "Building ${serviceName} (Maven)..."
+                            bat 'mvn clean install -Dmaven.test.skip=true'
 
-        //                     echo "Running Unit Tests for ${serviceName}..."
-        //                     bat 'mvn test'
-        //                     junit 'target/surefire-reports/*.xml'
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+                            echo "Running Unit Tests for ${serviceName}..."
+                            bat 'mvn test'
+                            junit 'target/surefire-reports/*.xml'
+                        }
+                    }
+                }
+            }
+        }
 
-        // stage('Build and Push Docker Images') {
-        //     steps {
-        //         script {
-        //             def services = microservices.split(' ').findAll { it != '' }
-        //             if (services.isEmpty()) {
-        //                 error('No microservices to build Docker images for. Aborting.')
-        //             }
+        stage('Build and Push Docker Images') {
+            steps {
+                script {
+                    def services = microservices.split(' ').findAll { it != '' }
+                    if (services.isEmpty()) {
+                        error('No microservices to build Docker images for. Aborting.')
+                    }
 
-        //             for (int i = 0; i < services.size(); i++) {
-        //                 def serviceName = services[i]
-        //                 echo "--- Building and pushing Docker image for ${serviceName} ---"
-        //                 dir("backend/services/${serviceName}") {
-        //                     def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
-        //                     def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
-        //                     def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
-        //                     echo "Building Docker image: ${imageName}"
-        //                     def image = docker.build(imageName)
-        //                     echo "Pushing Docker image ${image.id} to registry..."
-        //                     docker.withRegistry("https://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS_ID) {
-        //                         image.push()
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+                    for (int i = 0; i < services.size(); i++) {
+                        def serviceName = services[i]
+                        echo "--- Building and pushing Docker image for ${serviceName} ---"
+                        dir("backend/services/${serviceName}") {
+                            def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
+                            def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
+                            def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
+                            echo "Building Docker image: ${imageName}"
+                            def image = docker.build(imageName)
+                            echo "Pushing Docker image ${image.id} to registry..."
+                            docker.withRegistry("https://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS_ID) {
+                                image.push()
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         stage('Prepare Docker Networks') {
             steps {
@@ -113,127 +113,127 @@ pipeline {
             }
         }
 
-        // stage('Deploy to Docker') {
-        //     steps {
-        //         echo 'Deploying all microservices to Docker...'
-        //         script {
-        //             def services = microservices.split(' ').findAll { it != '' }
-        //             if (services.isEmpty()) {
-        //                 echo 'No microservices to deploy.'
-        //                 return
-        //             }
+        stage('Deploy to Docker') {
+            steps {
+                echo 'Deploying all microservices to Docker...'
+                script {
+                    def services = microservices.split(' ').findAll { it != '' }
+                    if (services.isEmpty()) {
+                        echo 'No microservices to deploy.'
+                        return
+                    }
 
-        //             // Định nghĩa cấu hình triển khai cho từng microservice
-        //             def serviceConfigs = [
-        //                 'iam-service': [
-        //                     ports: '8082:8082',
-        //                     env: [
-        //                         "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
-        //                         "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
-        //                         "PORT=8082",
-        //                         "CONSUL_HOST=consul",
-        //                         "CONSUL_PORT=8500"
-        //                     ],
-        //                     networks: ['gateway-network', 'backend-network']
-        //                 ],
-        //                 'user-service': [
-        //                     ports: "${env.USER_SERVICE_PORT}:${env.USER_SERVICE_PORT}",
-        //                     env: [
-        //                         "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
-        //                         "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
-        //                         "PORT=${env.USER_SERVICE_PORT}",
-        //                         "CONSUL_HOST=consul",
-        //                         "CONSUL_PORT=8500"
-        //                     ],
-        //                     networks: ['gateway-network', 'backend-network']
-        //                 ],
-        //                 'product-service': [
-        //                     ports: "${env.PRODUCT_SERVICE_PORT}:${env.PRODUCT_SERVICE_PORT}",
-        //                     env: [
-        //                         "KAFKA_SERVERS=kafka:9092",
-        //                         "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
-        //                         "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
-        //                         "PORT=${env.PRODUCT_SERVICE_PORT}",
-        //                         "CONSUL_HOST=consul",
-        //                         "CONSUL_PORT=8500"
-        //                     ],
-        //                     networks: ['gateway-network', 'backend-network']
-        //                 ],
-        //                 'cart-service': [
-        //                     ports: "${env.CART_SERVICE_PORT}:${env.CART_SERVICE_PORT}",
-        //                     env: [
-        //                         "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
-        //                         "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
-        //                         "PORT=${env.CART_SERVICE_PORT}",
-        //                         "CONSUL_HOST=consul",
-        //                         "CONSUL_PORT=8500",
-        //                         "SPRING_RABBITMQ_HOST=rabbitmq",
-        //                         "SPRING_RABBITMQ_PORT=5672",
-        //                         "SPRING_RABBITMQ_USERNAME=guest",
-        //                         "SPRING_RABBITMQ_PASSWORD=guest"
-        //                     ],
-        //                     networks: ['gateway-network', 'backend-network']
-        //                 ],
-        //                 'order-service': [
-        //                     ports: "${env.ORDER_SERVICE_PORT}:${env.ORDER_SERVICE_PORT}",
-        //                     env: [
-        //                         "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
-        //                         "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
-        //                         "PORT=${env.ORDER_SERVICE_PORT}",
-        //                         "CONSUL_HOST=consul",
-        //                         "CONSUL_PORT=8500",
-        //                         "SPRING_RABBITMQ_HOST=rabbitmq",
-        //                         "SPRING_RABBITMQ_PORT=5672",
-        //                         "SPRING_RABBITMQ_USERNAME=guest",
-        //                         "SPRING_RABBITMQ_PASSWORD=guest",
-        //                         "KAFKA_BOOTSTRAP_SERVERS=kafka:9092",
-        //                         "ORDER_CREATED_TOPIC=order_created_topic"
-        //                     ],
-        //                     networks: ['gateway-network', 'backend-network']
-        //                 ],
-        //                 'search-service': [
-        //                     ports: "${env.SEARCH_SERVICE_PORT}:${env.SEARCH_SERVICE_PORT}",
-        //                     env: [
-        //                         "SPRING_APPLICATION_NAME=search-service",
-        //                         "SERVER_PORT=${env.SEARCH_SERVICE_PORT}",
-        //                         "ES_HOST=elasticsearch",
-        //                         "ES_PORT=9200",
-        //                         "REDIS_HOST=redis",
-        //                         "REDIS_PORT=6379",
-        //                         "KAFKA_SERVERS=kafka:9092",
-        //                         "CONSUL_HOST=consul",
-        //                         "CONSUL_PORT=8500"
-        //                     ],
-        //                     networks: ['gateway-network', 'backend-network']
-        //                 ]
-        //             ]
+                    // Định nghĩa cấu hình triển khai cho từng microservice
+                    def serviceConfigs = [
+                        'iam-service': [
+                            ports: '8082:8082',
+                            env: [
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=8082",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'user-service': [
+                            ports: "${env.USER_SERVICE_PORT}:${env.USER_SERVICE_PORT}",
+                            env: [
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=${env.USER_SERVICE_PORT}",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'product-service': [
+                            ports: "${env.PRODUCT_SERVICE_PORT}:${env.PRODUCT_SERVICE_PORT}",
+                            env: [
+                                "KAFKA_SERVERS=kafka:9092",
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=${env.PRODUCT_SERVICE_PORT}",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'cart-service': [
+                            ports: "${env.CART_SERVICE_PORT}:${env.CART_SERVICE_PORT}",
+                            env: [
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=${env.CART_SERVICE_PORT}",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500",
+                                "SPRING_RABBITMQ_HOST=rabbitmq",
+                                "SPRING_RABBITMQ_PORT=5672",
+                                "SPRING_RABBITMQ_USERNAME=guest",
+                                "SPRING_RABBITMQ_PASSWORD=guest"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'order-service': [
+                            ports: "${env.ORDER_SERVICE_PORT}:${env.ORDER_SERVICE_PORT}",
+                            env: [
+                                "AUTH0_DOMAIN=${env.AUTH0_DOMAIN}",
+                                "AUTH0_AUDIENCE=${env.AUTH0_AUDIENCE}",
+                                "PORT=${env.ORDER_SERVICE_PORT}",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500",
+                                "SPRING_RABBITMQ_HOST=rabbitmq",
+                                "SPRING_RABBITMQ_PORT=5672",
+                                "SPRING_RABBITMQ_USERNAME=guest",
+                                "SPRING_RABBITMQ_PASSWORD=guest",
+                                "KAFKA_BOOTSTRAP_SERVERS=kafka:9092",
+                                "ORDER_CREATED_TOPIC=order_created_topic"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ],
+                        'search-service': [
+                            ports: "${env.SEARCH_SERVICE_PORT}:${env.SEARCH_SERVICE_PORT}",
+                            env: [
+                                "SPRING_APPLICATION_NAME=search-service",
+                                "SERVER_PORT=${env.SEARCH_SERVICE_PORT}",
+                                "ES_HOST=elasticsearch",
+                                "ES_PORT=9200",
+                                "REDIS_HOST=redis",
+                                "REDIS_PORT=6379",
+                                "KAFKA_SERVERS=kafka:9092",
+                                "CONSUL_HOST=consul",
+                                "CONSUL_PORT=8500"
+                            ],
+                            networks: ['gateway-network', 'backend-network']
+                        ]
+                    ]
 
-        //             for (int i = 0; i < services.size(); i++) {
-        //                 def serviceName = services[i]
-        //                 def config = serviceConfigs[serviceName]
-        //                 if (config) {
-        //                     echo "--- Initiating deployment for ${serviceName} ---"
-        //                     dir("backend/services/${serviceName}") {
-        //                         def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
-        //                         def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
-        //                         def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
-        //                         echo "Deploying ${serviceName} with Docker image: ${imageName}"
-        //                         bat "docker stop ${serviceName} || exit 0"
-        //                         bat "docker rm ${serviceName} || exit 0"
-        //                         bat "docker pull ${imageName}"
-        //                         def portMapping = config.ports ? "-p ${config.ports}" : ""
-        //                         def envVars = config.env ? config.env.collect { "-e ${it}" }.join(' ') : ""
-        //                         def networks = config.networks ? config.networks.collect { "--network ${it}" }.join(' ') : ""
-        //                         bat "docker run -d --name ${serviceName} ${portMapping} ${envVars} ${networks} ${imageName}"
-        //                         echo "Container ${serviceName} started with image ${imageName}"
-        //                     }
-        //                 } else {
-        //                     echo "WARNING: No specific Docker deployment configuration found for ${serviceName}. Skipping deployment for this service."
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+                    for (int i = 0; i < services.size(); i++) {
+                        def serviceName = services[i]
+                        def config = serviceConfigs[serviceName]
+                        if (config) {
+                            echo "--- Initiating deployment for ${serviceName} ---"
+                            dir("backend/services/${serviceName}") {
+                                def appVersionRaw = bat(returnStdout: true, script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout')
+                                def appVersion = appVersionRaw.readLines().findAll { it ==~ /^[0-9a-zA-Z\\.-]+$/ }[-1].trim()
+                                def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_HUB_USERNAME}/${serviceName.toLowerCase()}:${appVersion}-${env.BUILD_NUMBER}"
+                                echo "Deploying ${serviceName} with Docker image: ${imageName}"
+                                bat "docker stop ${serviceName} || exit 0"
+                                bat "docker rm ${serviceName} || exit 0"
+                                bat "docker pull ${imageName}"
+                                def portMapping = config.ports ? "-p ${config.ports}" : ""
+                                def envVars = config.env ? config.env.collect { "-e ${it}" }.join(' ') : ""
+                                def networks = config.networks ? config.networks.collect { "--network ${it}" }.join(' ') : ""
+                                bat "docker run -d --name ${serviceName} ${portMapping} ${envVars} ${networks} ${imageName}"
+                                echo "Container ${serviceName} started with image ${imageName}"
+                            }
+                        } else {
+                            echo "WARNING: No specific Docker deployment configuration found for ${serviceName}. Skipping deployment for this service."
+                        }
+                    }
+                }
+            }
+        }
 
         stage('SonarQube Analysis') {
             steps {
